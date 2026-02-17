@@ -1,0 +1,24 @@
+{
+    "name": "Kembangin Family Wealth",
+    "short_name": "Kembangin",
+    "description": "Manajemen Kekayaan Keluarga & Bisnis",
+    "start_url": "/personal/home",
+    "display": "standalone",
+    "background_color": "#fafafa",
+    "theme_color": "#0d9488",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/images/brand/logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/images/brand/logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
