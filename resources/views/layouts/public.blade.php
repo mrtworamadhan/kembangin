@@ -45,17 +45,17 @@
         </style>
     @endif
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('[PWA] Service Worker registered successfully:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('[PWA] Service Worker registration failed:', error);
-                    });
-            });
-        }
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(function (reg) {
+                    console.log('SW REGISTERED with scope:', reg.scope);
+                })
+                .catch(function (err) {
+                    console.error('SW FAILED:', err);
+                });
+        });
+    }
     </script>
 </head>
 <body class="antialiased bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 font-sans selection:bg-green-500 selection:text-white">
