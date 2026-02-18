@@ -85,8 +85,8 @@ new #[Layout('layouts::public')] class extends Component {
         </div>
     </section>
 
-    <section class="py-20 relative overflow-hidden">
-        <div class="absolute inset-0 bg-green-600 dark:bg-green-800 transform -skew-y-2 origin-top-left -z-10"></div>
+    <section class="py-20 relative overflow-hidden z-0">
+        <div class="absolute inset-0 bg-green-600 dark:bg-green-800 transform -skew-y-2 origin-top-left"></div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white relative z-10 pt-10 pb-4">
             <h2 class="text-3xl md:text-5xl font-extrabold mb-6">Siap Merapikan Keuangan Anda?</h2>
             <p class="text-green-100 text-lg mb-10">Bergabunglah dengan program Beta Eksklusif kami hari ini. Gratis tanpa syarat.</p>
