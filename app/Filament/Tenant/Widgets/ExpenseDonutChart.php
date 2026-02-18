@@ -21,7 +21,12 @@ class ExpenseDonutChart extends ChartWidget
         $data = Transaction::query()
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.business_id', $tenantId)
-            ->where('categories.type', 'expense') // Filter cuma pengeluaran
+            ->whereHas('category', function ($q) {
+                $q->where('type', 'expense')
+                ->whereNotIn('name', [
+                    'Transfer Keluar'
+                ]);
+            })
             ->selectRaw('categories.name as category_name, sum(transactions.amount) as total')
             ->groupBy('categories.name')
             ->pluck('total', 'category_name'); // Hasil: ['Listrik' => 500000, 'Gaji' => 2000000]

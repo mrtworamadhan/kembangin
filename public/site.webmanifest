@@ -2,7 +2,7 @@
     "name": "Kembangin Family Wealth",
     "short_name": "Kembangin",
     "description": "Manajemen Kekayaan Keluarga & Bisnis",
-    "start_url": "/personal/home",
+    "start_url": "/app/home",
     "display": "standalone",
     "background_color": "#fafafa",
     "theme_color": "#0d9488",

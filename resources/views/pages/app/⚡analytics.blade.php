@@ -88,7 +88,10 @@ new #[Layout('layouts::pwa')] class extends Component {
         $personalExpenseQuery = Transaction::whereNull('business_id')
             ->whereIn('user_id', $familyIds)
             ->where('date', '>=', $thisMonth)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'));
+            ->whereHas('category', fn($q) => $q->where('type', 'expense')
+                ->whereNotIn('name', [
+                    'Transfer Keluar',
+                ]));
 
         $totalPersonalExpense = (clone $personalExpenseQuery)->sum('amount');
 
@@ -174,7 +177,8 @@ new #[Layout('layouts::pwa')] class extends Component {
             $sales = Order::where('business_id', $this->selectedBusinessId)->where('order_date', '>=', $thisMonth)->sum('total_amount');
             $hpp = Purchase::where('business_id', $this->selectedBusinessId)->where('date', '>=', $thisMonth)->sum('total_amount');
             $opEx = Transaction::where('business_id', $this->selectedBusinessId)->where('date', '>=', $thisMonth)
-                ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden']))
+                ->whereHas('category', fn($q) => $q->where('type', 'expense')
+                    ->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden', 'Transfer Keluar']))
                 ->sum('amount');
             $totalExpense = $hpp + $opEx;
             $profit = $sales - $totalExpense;
@@ -186,8 +190,14 @@ new #[Layout('layouts::pwa')] class extends Component {
             $piutang = Order::where('business_id', $this->selectedBusinessId)->where('payment_status', 'unpaid')->sum('total_amount');
             $hutang = Purchase::where('business_id', $this->selectedBusinessId)->where('payment_status', 'unpaid')->sum('total_amount');
 
-            $bizTotalIncome = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'income'))->sum('amount');
-            $bizTotalExpense = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'expense'))->sum('amount');
+            $bizTotalIncome = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'income')
+                ->whereNotIn('name', [
+                    'Transfer Masuk',
+                ]))->sum('amount');
+            $bizTotalExpense = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'expense')
+                ->whereNotIn('name', [
+                    'Transfer Keluar',
+                ]))->sum('amount');
             $kasBisnis = $saldoAwal + $bizTotalIncome - $bizTotalExpense;
 
             $healthStatus = 'sehat';

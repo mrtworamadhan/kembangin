@@ -54,7 +54,7 @@ new #[Layout('layouts::pwa')] class extends Component {
             'category_id' => $this->categoryId,
             'amount' => $this->amount,
             'date' => now(),
-            'description' => $this->notes ?: 'Pengeluaran Rutin',
+            'description' => $this->notes ?: 'Pengeluaran',
         ]);
 
         $this->reset(['amount', 'notes', 'fromAccountId', 'categoryId']);
@@ -87,7 +87,7 @@ new #[Layout('layouts::pwa')] class extends Component {
             ]);
 
             // 2. Uang Masuk ke Pribadi
-            $catPersonal = Category::where('name', 'Hasil Bisnis (Prive)')->first();
+            $catPersonal = Category::where('name', 'Hasil Bisnis (Prive / Deviden)')->first();
             Transaction::create([
                 'business_id' => null,
                 'user_id' => $user->id,
@@ -140,10 +140,10 @@ new #[Layout('layouts::pwa')] class extends Component {
         $personalAccounts = Account::whereNull('business_id')->whereIn('user_id', $familyIds)->get();
         
         $businessAccounts = Account::where('business_id', $this->businessId)->get();
-
+        
         $expenseCategories = Category::where('group', 'personal')
             ->where('type', 'expense')
-            ->whereIn('nature', ['need', 'want'])
+            // ->whereIn('nature', ['need', 'want'])
             ->get();
 
         return [
@@ -208,7 +208,7 @@ new #[Layout('layouts::pwa')] class extends Component {
                 <select wire:model="fromAccountId" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-green-500 text-sm">
                     <option value="">-- Pilih Sumber Dana --</option>
                     @foreach($personalAccounts as $acc)
-                        <option value="{{ $acc->id }}">{{ $acc->name }}</option>
+                        <option value="{{ $acc->id }}">{{ $acc->name }} - {{ number_format($acc->current_balance, 0, ',', '.') }}</option>
                     @endforeach
                 </select>
             </div>
@@ -265,9 +265,13 @@ new #[Layout('layouts::pwa')] class extends Component {
                     <select wire:model="fromAccountId" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-green-500 text-xs">
                         <option value="">-- Pilih --</option>
                         @if($actionType === 'withdraw')
-                            @foreach($businessAccounts as $acc) <option value="{{ $acc->id }}">{{ $acc->name }}</option> @endforeach
+                            @foreach($businessAccounts as $acc) 
+                            <option value="{{ $acc->id }}">{{ $acc->name }} - {{ number_format($acc->current_balance, 0, ',', '.') }}</option>
+                            @endforeach
                         @else
-                            @foreach($personalAccounts as $acc) <option value="{{ $acc->id }}">{{ $acc->name }}</option> @endforeach
+                            @foreach($personalAccounts as $acc) 
+                            <option value="{{ $acc->id }}">{{ $acc->name }} - {{ number_format($acc->current_balance, 0, ',', '.') }}</option>
+                            @endforeach
                         @endif
                     </select>
                 </div>
@@ -277,9 +281,13 @@ new #[Layout('layouts::pwa')] class extends Component {
                     <select wire:model="toAccountId" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-green-500 text-xs">
                         <option value="">-- Pilih --</option>
                         @if($actionType === 'withdraw')
-                            @foreach($personalAccounts as $acc) <option value="{{ $acc->id }}">{{ $acc->name }}</option> @endforeach
+                            @foreach($personalAccounts as $acc) 
+                                <option value="{{ $acc->id }}">{{ $acc->name }} - {{ number_format($acc->current_balance, 0, ',', '.') }}</option>
+                            @endforeach
                         @else
-                            @foreach($businessAccounts as $acc) <option value="{{ $acc->id }}">{{ $acc->name }}</option> @endforeach
+                            @foreach($businessAccounts as $acc) 
+                                <option value="{{ $acc->id }}">{{ $acc->name }} - {{ number_format($acc->current_balance, 0, ',', '.') }}</option>
+                            @endforeach
                         @endif
                     </select>
                 </div>

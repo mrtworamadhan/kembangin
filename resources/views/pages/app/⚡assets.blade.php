@@ -67,6 +67,12 @@ new #[Layout('layouts::pwa')] class extends Component {
     public string $incomeSource = '';
     public ?int $incomeAccountId = null;
 
+    public bool $showTransferModal = false;
+    public ?int $transferFromAccountId = null;
+    public ?int $transferToAccountId = null;
+    public string $transferAmount = '';
+    public string $transferNotes = '';
+
     public function setTab($tab)
     {
         $this->assetTab = $tab;
@@ -139,6 +145,80 @@ new #[Layout('layouts::pwa')] class extends Component {
 
         $this->reset(['showIncomeModal', 'incomeAmount', 'incomeSource', 'incomeAccountId']);
         session()->flash('message', 'Pemasukan berhasil dicatat! Saldo dompet Anda telah bertambah.');
+    }
+
+    public function openTransferModal()
+    {
+        $this->reset(['transferFromAccountId', 'transferToAccountId', 'transferAmount', 'transferNotes']);
+        $this->showTransferModal = true;
+    }
+
+    public function saveTransfer()
+    {
+        // Validasi input
+        $this->validate([
+            'transferFromAccountId' => 'required|exists:accounts,id',
+            'transferToAccountId' => 'required|exists:accounts,id|different:transferFromAccountId',
+            'transferAmount' => 'required|numeric|min:1',
+            'transferNotes' => 'nullable|string|max:255',
+        ], [
+            'transferToAccountId.different' => 'Rekening tujuan tidak boleh sama dengan rekening asal.',
+        ]);
+
+        $user = auth()->user();
+
+        // Gunakan DB Transaction agar jika satu gagal, semuanya dibatalkan (aman)
+        DB::transaction(function () use ($user) {
+            
+            // 1. Buat Kategori Khusus Transfer (Agar Laba/Rugi tidak kacau)
+            $catOut = Category::firstOrCreate([
+                'business_id' => null, 
+                'name' => 'Transfer Keluar',
+                'type' => 'expense',
+                'group' => 'personal'
+            ]);
+
+            $catIn = Category::firstOrCreate([
+                'business_id' => null,
+                'name' => 'Transfer Masuk',
+                'type' => 'income',
+                'group' => 'personal'
+            ]);
+
+            $notes = $this->transferNotes ?: 'Transfer antar rekening';
+
+            // 2. Transaksi Uang Keluar (Dari Akun Asal)
+            Transaction::create([
+                'business_id' => null,
+                'user_id' => $user->id,
+                'account_id' => $this->transferFromAccountId,
+                'category_id' => $catOut->id,
+                'amount' => $this->transferAmount,
+                'type' => 'expense',
+                'date' => now(),
+                'description' => $notes,
+            ]);
+
+            // 3. Transaksi Uang Masuk (Ke Akun Tujuan)
+            Transaction::create([
+                'business_id' => null,
+                'user_id' => $user->id,
+                'account_id' => $this->transferToAccountId,
+                'category_id' => $catIn->id,
+                'amount' => $this->transferAmount,
+                'type' => 'income',
+                'date' => now(),
+                'description' => $notes,
+            ]);
+        });
+
+        // Tutup modal & reset form
+        $this->reset(['showTransferModal', 'transferFromAccountId', 'transferToAccountId', 'transferAmount', 'transferNotes']);
+        
+        // Refresh data jika kamu punya fungsi loadData() / mount()
+        // $this->loadData(); 
+
+        session()->flash('message', 'Transfer antar kas berhasil dicatat!');
     }
 
     // ==========================================
@@ -496,10 +576,16 @@ new #[Layout('layouts::pwa')] class extends Component {
                 </div>
             </div>
 
-            <button wire:click="openIncomeModal" class="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-sm transition shadow-sm flex items-center justify-center gap-2">
-                <x-heroicon-o-arrow-down-tray class="w-5 h-5" />
-                Catat Pemasukan (Gaji, Bonus, dll)
-            </button>
+            <div class="grid grid-cols-2 gap-3">
+                <button wire:click="openIncomeModal" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-xs sm:text-sm transition shadow-sm flex flex-col items-center justify-center gap-1.5">
+                    <x-heroicon-o-arrow-down-tray class="w-5 h-5" />
+                    Catat Pemasukan
+                </button>
+                <button wire:click="openTransferModal" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-xs sm:text-sm transition shadow-sm flex flex-col items-center justify-center gap-1.5">
+                    <x-heroicon-o-arrows-right-left class="w-5 h-5" />
+                    Transfer Kas
+                </button>
+            </div>
 
             <div>
                 <div class="flex justify-between items-center mb-4">
@@ -573,6 +659,66 @@ new #[Layout('layouts::pwa')] class extends Component {
                     <div class="flex gap-3 mt-6">
                         <button type="button" wire:click="$set('showIncomeModal', false)" class="flex-1 py-3 rounded-xl text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 font-bold text-sm transition">Batal</button>
                         <button type="submit" class="flex-1 py-3 rounded-xl text-white bg-green-600 hover:bg-green-700 font-bold text-sm transition shadow-sm">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    @if($showTransferModal)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-zinc-900/60 backdrop-blur-sm transition-opacity">
+            <div class="bg-white dark:bg-zinc-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-zinc-100 dark:border-zinc-700 animate-fade-in-up">
+                
+                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mb-4 mx-auto">
+                    <x-heroicon-o-arrows-right-left class="w-6 h-6" />
+                </div>
+                <h3 class="text-lg font-bold text-center text-zinc-800 dark:text-zinc-100 mb-1">
+                    Transfer Antar Kas
+                </h3>
+                <p class="text-xs text-center text-zinc-500 dark:text-zinc-400 mb-6">Pindahkan saldo tanpa mengubah Total Kekayaan Anda.</p>
+
+                <form wire:submit="saveTransfer" class="space-y-4">
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Dari Rekening</label>
+                            <select wire:model="transferFromAccountId" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-2 py-3 focus:ring-2 focus:ring-blue-500 text-xs font-semibold">
+                                <option value="">-- Asal --</option>
+                                @foreach($personalWallets as $acc) 
+                                    <option value="{{ $acc->id }}">{{ $acc->name }}</option> 
+                                @endforeach
+                            </select>
+                            @error('transferFromAccountId') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Ke Rekening</label>
+                            <select wire:model="transferToAccountId" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-2 py-3 focus:ring-2 focus:ring-blue-500 text-xs font-semibold">
+                                <option value="">-- Tujuan --</option>
+                                @foreach($personalWallets as $acc) 
+                                    <option value="{{ $acc->id }}">{{ $acc->name }}</option> 
+                                @endforeach
+                            </select>
+                            @error('transferToAccountId') <span class="text-[10px] text-red-500">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-500 uppercase mb-1">Nominal Transfer (Rp)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-zinc-400">Rp</span>
+                            <input type="number" wire:model="transferAmount" required min="1" class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 font-extrabold text-lg shadow-inner" placeholder="0">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-500 uppercase mb-1">Catatan (Opsional)</label>
+                        <input type="text" wire:model="transferNotes" class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Tarik tunai ATM, dll...">
+                    </div>
+
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" wire:click="$set('showTransferModal', false)" class="flex-1 py-3 rounded-xl text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 font-bold text-sm transition">Batal</button>
+                        <button type="submit" class="flex-1 py-3 rounded-xl text-white bg-blue-600 hover:bg-blue-700 font-bold text-sm transition shadow-sm">Transfer</button>
                     </div>
                 </form>
             </div>

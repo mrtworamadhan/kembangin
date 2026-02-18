@@ -85,7 +85,11 @@ new #[Layout('layouts::pwa')] class extends Component
         $monthlyPersonalExpense = Transaction::whereNull('business_id')
             ->whereIn('user_id', $familyIds)
             ->where('date', '>=', $thisMonth)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
+            ->whereHas('category', fn($q) => $q
+                ->where('type', 'expense')
+                ->whereNotIn('name', [
+                    'Transfer Keluar',
+                ]))
             ->sum('amount');
 
         $familyBusinesses = \App\Models\Business::whereHas('users', function($q) use ($familyIds) {

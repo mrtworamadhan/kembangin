@@ -14,7 +14,7 @@
     <link rel="canonical" href="{{ url()->current() }}">
 
     <link rel="icon" type="image/png" href="{{ asset('images/brand/icon-colour.png') }}">
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#16a34a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -120,7 +120,7 @@
                                     <x-heroicon-o-user class="w-5 h-5 text-zinc-400" /> Profil Saya
                                 </a>
                                 <a href="{{ url('/tenant') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition">
-                                    <x-heroicon-o-circle-stack class="w-5 h-5 text-zinc-400" /> Panel Data (Master)
+                                    <x-heroicon-o-circle-stack class="w-5 h-5 text-zinc-400" /> Panel Bisnis
                                 </a>
                                 <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition">
                                     <x-heroicon-o-cog-8-tooth class="w-5 h-5 text-zinc-400" /> Pengaturan

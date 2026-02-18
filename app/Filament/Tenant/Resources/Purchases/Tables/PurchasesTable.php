@@ -87,7 +87,7 @@ class PurchasesTable
                     ->visible(fn (Purchase $record) => $record->payment_status === 'unpaid')
                     ->action(function (Purchase $record, array $data) {
                         $category = Category::firstOrCreate(
-                            ['name' => 'Pembelian Stok', 'business_id' => $record->business_id],
+                            ['name' => 'Bahan Baku / Pembelian Stok'],
                             ['type' => 'expense', 'group' => 'business']
                         );
 

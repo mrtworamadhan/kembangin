@@ -145,7 +145,7 @@ class OrdersTable
                 //     ->icon('heroicon-o-document')
                 //     ->color('warning')
                 //     ->url(fn (Order $record) => route('invoice.preview', $record))
-                //     ->openUrlInNewTab(),
+                //     ->openUrlInNewTab()
                 Action::make('payment')
                     ->label('Terima Pembayaran')
                     ->icon('heroicon-o-currency-dollar')
@@ -173,7 +173,7 @@ class OrdersTable
                         }
 
                         $category = Category::firstOrCreate(
-                            ['name' => 'Penjualan Produk', 'business_id' => $record->business_id],
+                            ['name' => 'Penjualan Produk'],
                             ['type' => 'income', 'group' => 'business']
                         );
 

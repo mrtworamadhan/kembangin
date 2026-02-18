@@ -13,7 +13,7 @@
     <link rel="canonical" href="{{ url()->current() }}">
 
     <link rel="icon" type="image/png" href="{{ asset('images/brand/icon-colour.png') }}">
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <meta name="theme-color" content="#16a34a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
