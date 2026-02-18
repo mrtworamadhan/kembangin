@@ -3,6 +3,7 @@
     "short_name": "Kembangin",
     "description": "Manajemen Kekayaan Keluarga & Bisnis",
     "start_url": "/app/home",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#fafafa",
     "theme_color": "#0d9488",
