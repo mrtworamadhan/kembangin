@@ -66,6 +66,59 @@
             }
         </style>
     @endif
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <style>
+            .driver-popover {
+                border-radius: 1.5rem !important; 
+                padding: 1.5rem !important;
+                border: 1px solid #f4f4f5 !important;
+                box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+                font-family: inherit !important;
+            }
+            .dark .driver-popover {
+                background-color: #27272a !important;
+                border-color: #3f3f46 !important;
+            }
+            .driver-popover-title {
+                font-size: 1.125rem !important;
+                font-weight: 800 !important;
+                color: #27272a !important;
+            }
+            .dark .driver-popover-title { color: #f4f4f5 !important; }
+            .driver-popover-description {
+                font-size: 0.875rem !important;
+                color: #71717a !important;
+                margin-top: 0.5rem !important;
+                line-height: 1.5 !important;
+            }
+            .dark .driver-popover-description { color: #a1a1aa !important; }
+            
+            .driver-popover-next-btn {
+                background-color: #16a34a !important;
+                color: white !important;
+                border-radius: 0.75rem !important;
+                font-weight: 700 !important;
+                padding: 0.6rem 1.2rem !important;
+                border: none !important;
+                text-shadow: none !important;
+                box-shadow: 0 4px 6px -1px rgb(22 163 74 / 0.3) !important;
+            }
+            
+            .driver-popover-prev-btn, .driver-popover-close-btn {
+                background-color: #f4f4f5 !important;
+                color: #52525b !important;
+                border-radius: 0.75rem !important;
+                font-weight: 700 !important;
+                padding: 0.6rem 1.2rem !important;
+                border: none !important;
+                text-shadow: none !important;
+            }
+            .dark .driver-popover-prev-btn, .dark .driver-popover-close-btn {
+                background-color: #3f3f46 !important;
+                color: #e4e4e7 !important;
+            }
+        </style>
 </head>
 <body class="antialiased bg-zinc-50 dark:bg-zinc-900 transition-colors duration-300">
 
@@ -73,6 +126,8 @@
         x-data="{ darkMode: localStorage.getItem('theme') === 'dark', showProfileMenu: false }"
         x-init="$watch('darkMode', val => localStorage.setItem('theme', val ? 'dark' : 'light'))"
         :class="{ 'dark': darkMode }"
+        @open-profile-menu.window="showProfileMenu = true"
+        @close-profile-menu.window="showProfileMenu = false"
     >
         
         <div class="min-h-screen bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 font-sans pb-24 relative">
@@ -95,7 +150,7 @@
                     </button>
                     
                     <div class="relative">
-                        <button @click="showProfileMenu = !showProfileMenu" @click.away="showProfileMenu = false" class="w-8 h-8 rounded-full bg-green-600 dark:bg-green-700 text-white flex items-center justify-center text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 transition transform hover:scale-105">
+                        <button id="tour-profil" @click="showProfileMenu = !showProfileMenu" @click.away="showProfileMenu = false" class="w-8 h-8 rounded-full bg-green-600 dark:bg-green-700 text-white flex items-center justify-center text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 transition transform hover:scale-105">
                             {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
                         </button>
 
@@ -119,7 +174,7 @@
                                 <a href="{{ route('app.profile') }}" wire:navigate class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition">
                                     <x-heroicon-o-user class="w-5 h-5 text-zinc-400" /> Profil Saya
                                 </a>
-                                <a href="{{ url('/tenant') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition">
+                                <a id="tour-panel-bisnis" href="{{ url('/tenant') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition">
                                     <x-heroicon-o-circle-stack class="w-5 h-5 text-zinc-400" /> Panel Bisnis
                                 </a>
                                 <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition">
@@ -155,7 +210,7 @@
                     <span class="text-[10px] font-medium">Home</span>
                 </a>
 
-                <a href="{{ route('app.analytics') }}" wire:navigate class="flex flex-col items-center p-2 w-14 transition {{ request()->routeIs('app.analytics') ? 'text-green-600 dark:text-green-400 scale-110' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300' }}">
+                <a id="tour-analisa" href="{{ route('app.analytics') }}" wire:navigate class="flex flex-col items-center p-2 w-14 transition {{ request()->routeIs('app.analytics') ? 'text-green-600 dark:text-green-400 scale-110' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300' }}">
                     @if(request()->routeIs('app.analytics'))
                         <x-heroicon-s-chart-pie class="w-6 h-6 mb-1" />
                     @else
@@ -165,12 +220,12 @@
                 </a>
 
                 <div class="relative -top-5 w-14 flex justify-center">
-                    <a href="{{ route('app.transaction') }}" wire:navigate class="flex items-center justify-center w-[52px] h-[52px] bg-gradient-to-br from-green-600 to-teal-600 text-white rounded-full shadow-lg hover:bg-green-700 dark:hover:bg-green-400 transition transform hover:scale-105 border-4 border-zinc-50 dark:border-zinc-900 focus:outline-none">
+                    <a id="tour-transaksi" href="{{ route('app.transaction') }}" wire:navigate class="flex items-center justify-center w-[52px] h-[52px] bg-gradient-to-br from-green-600 to-teal-600 text-white rounded-full shadow-lg hover:bg-green-700 dark:hover:bg-green-400 transition transform hover:scale-105 border-4 border-zinc-50 dark:border-zinc-900 focus:outline-none">
                         <x-heroicon-o-arrows-right-left class="w-6 h-6" />
                     </a>
                 </div>
 
-                <a href="{{ route('app.assets') }}" wire:navigate class="flex flex-col items-center p-2 w-14 transition {{ request()->routeIs('app.assets') ? 'text-green-600 dark:text-green-400 scale-110' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300' }}">
+                <a id="tour-dompet" href="{{ route('app.assets') }}" wire:navigate class="flex flex-col items-center p-2 w-14 transition {{ request()->routeIs('app.assets') ? 'text-green-600 dark:text-green-400 scale-110' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300' }}">
                     @if(request()->routeIs('app.assets'))
                         <x-heroicon-s-wallet class="w-6 h-6 mb-1" />
                     @else
@@ -179,7 +234,7 @@
                     <span class="text-[10px] font-medium">Assets</span>
                 </a>
 
-                <a href="{{ route('app.ledger') }}" wire:navigate class="flex flex-col items-center p-2 w-14 transition {{ request()->routeIs('app.ledger') ? 'text-green-600 dark:text-green-400 scale-110' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300' }}">
+                <a id="tour-mutasi" href="{{ route('app.ledger') }}" wire:navigate class="flex flex-col items-center p-2 w-14 transition {{ request()->routeIs('app.ledger') ? 'text-green-600 dark:text-green-400 scale-110' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300' }}">
                     @if(request()->routeIs('app.ledger'))
                         <x-heroicon-s-document-text class="w-6 h-6 mb-1" />
                     @else
@@ -193,5 +248,6 @@
     </div>
 
     @livewireScripts
+    
 </body>
 </html>

@@ -29,6 +29,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'role',
         'is_active',
         'status',
+        'has_seen_tour',
         'avatar_url'
     ];
 

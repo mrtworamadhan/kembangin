@@ -20,6 +20,11 @@ new #[Layout('layouts::pwa')] class extends Component
     public ?int $expenseCategoryId = null;
     public string $expenseNotes = '';
 
+    public function markTourAsSeen()
+    {
+        auth()->user()->update(['has_seen_tour' => true]);
+    }
+
     public function openExpenseModal()
     {
         $this->reset(['expenseAmount', 'expenseAccountId', 'expenseCategoryId', 'expenseNotes']);
@@ -102,6 +107,7 @@ new #[Layout('layouts::pwa')] class extends Component
             ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', [
                 'Bahan Baku / Pembelian Stok',
                 'Penarikan Prive / Deviden',
+                'Transfer Keluar'
             ]))->sum('amount');
         $businessProfit = $homeSales - $homePurchase - $homeOpEx;
 
@@ -140,7 +146,7 @@ new #[Layout('layouts::pwa')] class extends Component
 ?>
 
 <div class="animate-fade-in space-y-5 pb-8">
-                
+    
     @if (session()->has('message'))
         <div class="p-4 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-2xl flex items-center gap-3 shadow-sm border border-green-200 dark:border-green-800 animate-fade-in-up">
             <x-heroicon-o-check-circle class="w-6 h-6 shrink-0" />
@@ -158,7 +164,7 @@ new #[Layout('layouts::pwa')] class extends Component
     </div>
 
     <div class="animate-fade-in-up">
-        <a href="{{ route('app.assets') }}" wire:navigate class="block bg-gradient-to-br from-green-500 to-green-700 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden transition-transform hover:scale-[1.02] hover:shadow-green-500/30">
+        <a id="tour-kas-free" href="{{ route('app.assets') }}" wire:navigate class="block bg-gradient-to-br from-green-500 to-green-700 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden transition-transform hover:scale-[1.02] hover:shadow-green-500/30">
             <div class="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
             <div class="absolute bottom-0 left-0 w-24 h-24 bg-black opacity-10 rounded-t-full blur-xl"></div>
             
@@ -187,13 +193,13 @@ new #[Layout('layouts::pwa')] class extends Component
             </div>
         </a>
         
-        <button wire:click="openExpenseModal" class="w-full mt-3 py-3.5 bg-zinc-800 dark:bg-zinc-700 hover:bg-zinc-900 dark:hover:bg-zinc-600 text-white rounded-2xl font-bold text-sm transition shadow-md flex items-center justify-center gap-2">
+        <button id="tour-expense" wire:click="openExpenseModal" class="w-full mt-3 py-3.5 bg-zinc-800 dark:bg-zinc-700 hover:bg-zinc-900 dark:hover:bg-zinc-600 text-white rounded-2xl font-bold text-sm transition shadow-md flex items-center justify-center gap-2">
             <x-heroicon-o-bolt class="w-5 h-5 text-amber-400" />
             Catat Pengeluaran
         </button>
     </div>
 
-    <a href="{{ route('app.assets') }}" wire:navigate class="block bg-white dark:bg-zinc-800 p-5 rounded-3xl shadow-sm border border-zinc-100 dark:border-zinc-700 transition-transform hover:scale-[1.02] hover:border-blue-500/50 group">
+    <a id="tour-budget" href="{{ route('app.assets') }}" wire:navigate class="block bg-white dark:bg-zinc-800 p-5 rounded-3xl shadow-sm border border-zinc-100 dark:border-zinc-700 transition-transform hover:scale-[1.02] hover:border-blue-500/50 group">
         <div class="flex justify-between items-center mb-3">
             <div class="flex items-center gap-2">
                 <div class="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg group-hover:bg-blue-100 transition-colors">
@@ -262,7 +268,7 @@ new #[Layout('layouts::pwa')] class extends Component
         </a>
     </div>
 
-    <div>
+    <div id="tour-impian">
         <div class="flex justify-between items-end mb-3">
             <h3 class="text-sm font-bold text-zinc-700 dark:text-zinc-200">Fokus Impian Terdekat</h3>
         </div>
@@ -366,5 +372,66 @@ new #[Layout('layouts::pwa')] class extends Component
             </div>
         </div>
     @endif
+    
+    @if(!auth()->user()->has_seen_tour)
+
+        @script
+        <script>
+            setTimeout(() => {
+                if (typeof window.driver === 'undefined') {
+                    console.error('Driver.js gagal di-load!');
+                    return;
+                }
+
+                const driver = window.driver.js.driver;
+                
+                const driverObj = driver({
+                    showProgress: true,
+                    allowClose: false,
+                    nextBtnText: 'Lanjut ➔',
+                    prevBtnText: '⬅ Kembali',
+                    doneBtnText: 'Selesai & Mulai! 🚀',
+                    
+                    onDestroyStarted: () => {
+                        if (!driverObj.hasNextStep() || confirm("Yakin ingin melewati panduan ini?")) {
+                            $wire.markTourAsSeen(); 
+                            driverObj.destroy();
+                            window.dispatchEvent(new Event('close-profile-menu'));
+                        }
+                    },
+                    
+                    steps: [
+                        { popover: { title: 'Selamat Datang di Kembangin! 🎉', description: 'Mari ikuti panduan 1 menit ini untuk memaksimalkan keuangan Anda.' } },
+                        { element: '#tour-dompet', popover: { title: '1. Buka Dompet', description: 'Catat semua rekening bank dan uang tunai yang Anda pegang di menu Assets ini.', side: "top", align: 'center' } },
+                        { element: '#tour-kas-free', popover: { title: '2. Pantau Kas Free', description: 'Sistem akan otomatis menghitung "Uang Jajan" yang aman dipakai hari ini.', side: "bottom", align: 'center' } },
+                        { element: '#tour-expense', popover: { title: '3. Catat Pengeluaran', description: 'Sistem akan otomatis Mencatat pengeluaranmu.', side: "bottom", align: 'center' } },
+                        { element: '#tour-transaksi', popover: { title: '4. Catat Transaksi', description: 'Gunakan tombol ini untuk mencatat pengeluaran atau pemasukan.', side: "top", align: 'center' } },
+                        { element: '#tour-budget', popover: { title: '5. Atur Budget Rutin', description: 'Alokasikan budget bulanan Anda di sini agar Kas Free tetap akurat.', side: "bottom", align: 'center' } },
+                        { element: '#tour-impian', popover: { title: '6. Kejar Target Impian', description: 'Punya target KPR atau Umroh? Buat targetnya di sini.', side: "top", align: 'center' } },
+                        
+                        { 
+                            element: '#tour-profil', 
+                            popover: { title: '7. Menu Profil', description: 'Klik ikon ini untuk mengakses pengaturan akun dan Dapur Admin.', side: "bottom", align: 'end' },
+                            onHighlightStarted: () => { window.dispatchEvent(new Event('close-profile-menu')); }
+                        },
+                        
+                        { 
+                            element: '#tour-panel-bisnis', 
+                            popover: { title: '8. Panel Bisnis', description: 'Masuk ke sini untuk mengelola Master Data dan mengundang pasangan Anda.', side: "left", align: 'center' },
+                            onHighlightStarted: () => { window.dispatchEvent(new Event('open-profile-menu')); },
+                            onDeselected: () => { window.dispatchEvent(new Event('close-profile-menu')); }
+                        },
+                        
+                        { element: '#tour-analisa', popover: { title: '9. Analisa Keuangan', description: 'Cek grafik pengeluaran dan evaluasi kesehatan finansial Anda.', side: "top", align: 'center' } },
+                        { element: '#tour-mutasi', popover: { title: '10. Cek Mutasi', description: 'Lihat seluruh riwayat aliran uang masuk dan keluar.', side: "top", align: 'center' } }
+                    ]
+                });
+
+                driverObj.drive();
+            }, 500); 
+        </script>
+        @endscript
+    @endif
 
 </div>
+

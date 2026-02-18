@@ -26,13 +26,12 @@ class UsersTable
                 TextColumn::make('email')
                     ->label('Email address')
                     ->searchable(),
+                TextColumn::make('phone')
+                    ->label('No. Wa')
+                    ->searchable(),
                 TextColumn::make('role')
                     ->searchable(),
-                SelectColumn::make('status')
-                     ->options([
-                            'pending' => 'Pending',
-                            'active' => 'Aktif',
-                        ]),
+                
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -65,7 +64,7 @@ class UsersTable
                         }
 
                         $loginUrl = url('/login');
-                        $message = urlencode("Halo {$record->name}! \n\nSelamat, akun Kembangin Anda sudah *AKTIF*.\nSilakan login ke aplikasi melalui link berikut:\n{$loginUrl}\n\nTerima kasih!");
+                        $message = urlencode("Halo {$record->name}! \n\nSelamat, akun Kembangin Anda sudah *AKTIF*.\n Selamat Berkembang bersama Kembangin, atur keuangan Usaha dan Rumah Tangga, *Usaha Berkembang Keluarga Tenang*.\n\nSilakan login ke aplikasi melalui link berikut:\n\n{$loginUrl}\n\nTerima kasih!");
                         
                         if (empty($phone)) {
                             Notification::make()
@@ -92,8 +91,8 @@ class UsersTable
                             ])
                             ->send();
                     }),
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()->label(''),
+                DeleteAction::make()->label(''),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
