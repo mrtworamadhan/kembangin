@@ -54,12 +54,10 @@
         <style> 
             [x-cloak] { display: none !important; } 
             
-            /* Libas habis scrollbar di SEMUA elemen untuk Chrome, Safari, Edge, Opera */
             *::-webkit-scrollbar {
                 display: none !important;
             }
 
-            /* Libas habis scrollbar untuk Firefox & IE */
             * {
                 -ms-overflow-style: none !important;
                 scrollbar-width: none !important;

@@ -33,7 +33,7 @@ class TenantPanelProvider extends PanelProvider
             
             ->favicon(asset('images/brand/icon-colour.png'))
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => '#16a34a',
             ])
             ->tenant(Business::class, slugAttribute: 'slug')
             ->tenantRegistration(RegisterBusiness::class)
