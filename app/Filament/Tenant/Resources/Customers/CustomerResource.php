@@ -5,6 +5,7 @@ namespace App\Filament\Tenant\Resources\Customers;
 use App\Filament\Tenant\Resources\Customers\Pages\CreateCustomer;
 use App\Filament\Tenant\Resources\Customers\Pages\EditCustomer;
 use App\Filament\Tenant\Resources\Customers\Pages\ListCustomers;
+use App\Filament\Tenant\Resources\Customers\RelationManagers\OrdersRelationManager;
 use App\Filament\Tenant\Resources\Customers\Schemas\CustomerForm;
 use App\Filament\Tenant\Resources\Customers\Tables\CustomersTable;
 use App\Models\Customer;
@@ -39,7 +40,7 @@ class CustomerResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            OrdersRelationManager::class,
         ];
     }
 

@@ -16,8 +16,11 @@ class UserForm
         return $schema
             ->components([
                 TextInput::make('name')
-                ->required()
-                ->maxLength(255),
+                    ->required()
+                    ->maxLength(255),
+                TextInput::make('phone')
+                    ->tel()
+                    ->required(),   
                 TextInput::make('email')
                     ->email()
                     ->required()
@@ -25,7 +28,15 @@ class UserForm
                 Select::make('role')
                     ->options([
                         'admin' => 'Super Admin',
-                        'user' => 'User / Tenant',
+                        'owner' => 'Owner',
+                        'staff' => 'Staff',
+                    ])
+                    ->required()
+                    ->default('user'),
+                Select::make('status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'active' => 'Aktif',
                     ])
                     ->required()
                     ->default('user'),

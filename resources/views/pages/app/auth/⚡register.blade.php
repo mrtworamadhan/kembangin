@@ -10,6 +10,7 @@ new #[Layout('layouts::auth')] class extends Component {
     
     public string $name = '';
     public string $email = '';
+    public string $phone = '';
     public string $password = '';
     public string $password_confirmation = '';
 
@@ -18,12 +19,14 @@ new #[Layout('layouts::auth')] class extends Component {
         $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'phone' => ['required', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
         $user = User::create([
             'name' => $this->name,
             'email' => $this->email,
+            'phone' => $this->phone, 
             'password' => Hash::make($this->password),
             'role' => 'owner',
             'status' => 'pending',
@@ -71,6 +74,17 @@ new #[Layout('layouts::auth')] class extends Component {
                     <input type="email" wire:model="email" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl py-3 pl-11 pr-4 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm font-medium transition-all" placeholder="budi@email.com">
                 </div>
                 @error('email') <span class="text-xs text-red-500 mt-1 font-medium block">{{ $message }}</span> @enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">Nomor WhatsApp</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <x-heroicon-o-phone class="w-5 h-5 text-zinc-400" />
+                    </div>
+                    <input type="text" wire:model="phone" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-xl py-3 pl-11 pr-4 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm font-medium transition-all" placeholder="081234567890">
+                </div>
+                @error('phone') <span class="text-xs text-red-500 mt-1 font-medium block">{{ $message }}</span> @enderror
             </div>
 
             <div class="grid grid-cols-2 gap-3">

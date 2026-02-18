@@ -5,6 +5,7 @@ namespace App\Filament\Tenant\Resources\Suppliers;
 use App\Filament\Tenant\Resources\Suppliers\Pages\CreateSupplier;
 use App\Filament\Tenant\Resources\Suppliers\Pages\EditSupplier;
 use App\Filament\Tenant\Resources\Suppliers\Pages\ListSuppliers;
+use App\Filament\Tenant\Resources\Suppliers\RelationManagers\PurchasesRelationManager;
 use App\Filament\Tenant\Resources\Suppliers\Schemas\SupplierForm;
 use App\Filament\Tenant\Resources\Suppliers\Tables\SuppliersTable;
 use App\Models\Supplier;
@@ -39,7 +40,7 @@ class SupplierResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            PurchasesRelationManager::class,
         ];
     }
 

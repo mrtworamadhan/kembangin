@@ -37,7 +37,13 @@
     
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
-    <style> [x-cloak] { display: none !important; } </style>
+    @if(config('services.ga.measurement_id') || env('GA_MEASUREMENT_ID'))
+        <script async src="https://www.googletagmanager.com/gtag/js?id={{ env('GA_MEASUREMENT_ID') }}"></script>
+        <style> 
+            [x-cloak] { display: none !important; } 
+            
+        </style>
+    @endif
 </head>
 <body class="antialiased bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 font-sans selection:bg-green-500 selection:text-white">
     <div 

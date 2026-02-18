@@ -17,6 +17,7 @@ use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class OrdersTable
 {
@@ -49,33 +50,102 @@ class OrdersTable
                 //
             ])
             ->recordActions([
-                // Action::make('pdf')
-                //     ->label('Download PDF')
-                //     ->icon('heroicon-o-document-arrow-down')
-                //     ->color('warning')
-                //     ->action(function (Order $record) {
-                //         $business = $record->business;
-                //         $theme = $record->business->invoice_theme ?? 'modern';
-                //         $color = $business->invoice_color ?? '#F59E0B';
-                        
-                //         $pdf = Pdf::loadView('invoices.' . $theme, [
-                //             'order' => $record,
-                //             'color' => $color,    
-                //             'logo' => $business->logo,
-                //         ]);
-
-                //         $pdf->setPaper('a4', 'portrait');
-
-                //         return response()->streamDownload(function () use ($pdf) {
-                //             echo $pdf->output();
-                //         }, 'Invoice-' . $record->number . '.pdf');
-                //     }),
-                Action::make('preview_pdf')
-                    ->label('Preview PDF')
-                    ->icon('heroicon-o-document')
+                Action::make('pdf')
+                    ->label('Download PDF')
+                    ->icon('heroicon-o-document-arrow-down')
                     ->color('warning')
-                    ->url(fn (Order $record) => route('invoice.preview', $record))
-                    ->openUrlInNewTab(),
+                    ->action(function (Order $record) {
+                        $business = $record->business;
+                        $theme = $record->business->invoice_theme ?? 'modern';
+                        $color = $business->invoice_color ?? '#F59E0B';
+                        
+                        $pdf = Pdf::loadView('invoices.' . $theme, [
+                            'order' => $record,
+                            'color' => $color,    
+                            'logo' => $business->logo,
+                        ]);
+
+                        $pdf->setPaper('a4', 'portrait');
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->output();
+                        }, 'Invoice-' . $record->number . '.pdf');
+                    }),
+                Action::make('send_wa')
+                    ->label('Kirim WA')
+                    ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Kirim Invoice via WhatsApp?')
+                    ->modalDescription('Sistem akan membuatkan link PDF dan mengarahkan Anda ke WhatsApp Web/App.')
+                    ->action(function (Order $record) {
+                        
+                        // 1. Ambil Data (Sama seperti fungsi download)
+                        $business = $record->business;
+                        $theme = $business->invoice_theme ?? 'modern';
+                        $color = $business->invoice_color ?? '#F59E0B';
+                        
+                        // 2. Render PDF
+                        $pdf = Pdf::loadView('invoices.' . $theme, [
+                            'order' => $record,
+                            'color' => $color,    
+                            'logo' => $business->logo,
+                        ])->setPaper('a4', 'portrait');
+
+                        // 3. Simpan PDF ke folder public secara fisik
+                        $fileName = 'invoices/Invoice-' . $record->number . '.pdf';
+                        Storage::disk('public')->put($fileName, $pdf->output());
+
+                        // 4. Dapatkan URL Publik dari PDF tersebut
+                        $fileUrl = asset('storage/' . $fileName);
+
+                        // 5. Cek & Format Nomor WA Pelanggan
+                        $phone = $record->customer->phone ?? ''; 
+                        
+                        if (empty($phone)) {
+                            Notification::make()
+                                ->title('Gagal Mengirim')
+                                ->body('Nomor WhatsApp pelanggan tidak ditemukan di data transaksi ini.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        // Format nomor (0812 jadi 62812)
+                        $phone = preg_replace('/[^0-9]/', '', $phone);
+                        if (str_starts_with($phone, '0')) {
+                            $phone = '62' . substr($phone, 1);
+                        }
+
+                        // 6. Buat Teks Pesan WA
+                        $message = "Halo Bapak/Ibu, \n\nBerikut adalah tagihan (Invoice) untuk pesanan Anda: *{$record->number}*.\n\n";
+                        $message .= "Anda dapat melihat dan mengunduh invoice melalui tautan berikut:\n";
+                        $message .= $fileUrl . "\n\n";
+                        $message .= "Terima kasih telah mempercayakan bisnis Anda kepada *{$business->name}*.";
+
+                        $waUrl = "https://wa.me/{$phone}?text=" . urlencode($message);
+
+                        // 7. Munculkan Notifikasi dengan tombol Buka WA (Agar bisa buka di Tab Baru)
+                        Notification::make()
+                            ->title('Link Invoice Siap Dikirim!')
+                            ->body('Klik tombol di bawah untuk membuka WhatsApp.')
+                            ->success()
+                            ->persistent()
+                            ->actions([
+                                Action::make('buka_wa')
+                                    ->label('Buka WhatsApp Sekarang')
+                                    ->button()
+                                    ->color('success')
+                                    ->url($waUrl, shouldOpenInNewTab: true),
+                            ])
+                            ->send();
+                    }),
+                // Action::make('preview_pdf')
+                //     ->label('Preview PDF')
+                //     ->icon('heroicon-o-document')
+                //     ->color('warning')
+                //     ->url(fn (Order $record) => route('invoice.preview', $record))
+                //     ->openUrlInNewTab(),
                 Action::make('payment')
                     ->label('Terima Pembayaran')
                     ->icon('heroicon-o-currency-dollar')
