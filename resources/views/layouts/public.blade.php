@@ -87,13 +87,19 @@
                                 <x-heroicon-o-sun x-show="darkMode" class="w-5 h-5" x-cloak />
                             </button>
                             
-                            <a href="{{ route('login') }}" class="text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:text-green-600 dark:hover:text-green-400 transition-colors duration-200">
-                                Masuk
-                            </a>
+                            @auth
+                                <a href="{{ route('app.home') }}" wire:navigate class="px-6 py-2 bg-green-600 text-white rounded-xl font-bold">
+                                    Kembali ke Aplikasi
+                                </a>
+                            @else
+                                <a href="{{ route('login') }}" class="px-6 py-2 border border-zinc-200 rounded-xl font-bold">
+                                    Masuk
+                                </a>
 
-                            <a href="{{ route('register') }}" class="px-5 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-full shadow-lg shadow-green-600/20 transition-all duration-300 hover:scale-105">
-                                Daftar Gratis
-                            </a>
+                                <a href="{{ route('register') }}" class="px-5 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-full shadow-lg shadow-green-600/20 transition-all duration-300 hover:scale-105">
+                                    Daftar Gratis
+                                </a>
+                            @endauth
                         </div>
 
                         <div class="flex items-center gap-2 md:hidden">
@@ -116,12 +122,20 @@
                         <a href="{{ route('docs') }}" class="block px-3 py-2 text-base font-bold text-zinc-800 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-md">
                             Panduan
                         </a>
+                        @auth
+                        <a href="{{ route('app.home') }}" class="block mt-2 px-3 py-3 text-center text-base font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                            Kembali Ke Aplikasi
+                        </a>
+                        @else
                         <a href="{{ route('login') }}" class="block px-3 py-2 text-base font-bold text-zinc-800 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-md">
                             Masuk
                         </a>
                         <a href="{{ route('register') }}" class="block mt-2 px-3 py-3 text-center text-base font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
                             Daftar Gratis
                         </a>
+                        @endauth
+                        
+                        
                     </div>
                 </div>
             </nav>
