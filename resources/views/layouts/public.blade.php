@@ -6,34 +6,39 @@
 
     <title>{{ $title ?? 'Kembangin - Usaha Berkembang, Keluarga Tenang' }}</title>
 
-    <meta name="description" content="{{ $description ?? 'Aplikasi cerdas untuk manajemen kekayaan keluarga, pencatatan bisnis, dan pengaturan anggaran rutin secara real-time.' }}">
-    <meta name="keywords" content="Keuangan Keluarga, Manajemen Aset, PWA Keuangan, Pencatatan Bisnis, Kembangin, Budgeting, Wealth Management">
+    <meta name="description" content="{{ $description ?? 'Aplikasi cerdas untuk manajemen kekayaan keluarga & bisnis.' }}">
+    <meta name="keywords" content="Keuangan Keluarga, Manajemen Aset, Budgeting, Wealth Management">
     <meta name="author" content="Kembangin">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="{{ url()->current() }}">
 
-    <link rel="icon" type="image/png" href="{{ asset('images/brand/icon-colour.png') }}">
-    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#16a34a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Kembangin">
-    <link rel="apple-touch-icon" href="{{ asset('images/brand/icon-colour.png') }}">
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ url()->current() }}">
     <meta property="og:title" content="{{ $title ?? 'Kembangin - Family Wealth' }}">
-    <meta property="og:description" content="{{ $description ?? 'Pantau kas free, atur prioritas anggaran, dan capai impian finansial keluargamu dengan mudah.' }}">
-    <meta property="og:image" content="{{ asset('images/brand/icon-colour.png') }}">
+    <meta property="og:description" content="{{ $description ?? 'Pantau kas, atur prioritas anggaran, capai impian finansial.' }}">
+    <meta property="og:image" content="{{ asset('images/brand/logo-1.png') }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="og:site_name" content="Kembangin">
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ $title ?? 'Kembangin - Family Wealth' }}">
-    <meta name="twitter:description" content="{{ $description ?? 'Pantau kas free, atur prioritas anggaran, dan capai impian finansial keluargamu dengan mudah.' }}">
-    <meta name="twitter:image" content="{{ asset('images/brand/icon-colour.png') }}">
-
-    <link rel="icon" type="image/png" href="{{ asset('images/brand/logo.png') }}">
+    <meta name="twitter:description" content="{{ $description ?? 'Pantau kas, atur prioritas anggaran, capai impian finansial.' }}">
+    <meta name="twitter:image" content="{{ asset('images/brand/logo-1.png') }}">
     
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
