@@ -30,7 +30,6 @@ class TenantPanelProvider extends PanelProvider
         return $panel
             ->id('tenant')
             ->path('tenant')
-            
             ->favicon(asset('images/brand/icon-colour.png'))
             ->colors([
                 'primary' => '#16a34a',
