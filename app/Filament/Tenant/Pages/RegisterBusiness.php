@@ -108,6 +108,7 @@ class RegisterBusiness extends RegisterTenant
                         FileUpload::make('signature')
                             ->label('Scan Tanda Tangan')
                             ->image()
+                            ->disk('public')
                             ->directory('business-signatures') 
                             ->visibility('public')
                             ->maxSize(1024)

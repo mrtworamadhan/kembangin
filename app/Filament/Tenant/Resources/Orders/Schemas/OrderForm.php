@@ -135,8 +135,13 @@ class OrderForm
                             ->columns(12)
                             ->live()
                             ->afterStateUpdated(function (Get $get, Set $set) {
-                                $items = $get('items'); 
-                                $total = collect($items)->sum(fn ($item) => $item['quantity'] * $item['unit_price']);
+                                $items = $get('items') ?? [];
+
+                                $total = collect($items)->sum(function ($item) {
+                                    return ((float) ($item['quantity'] ?? 0)) 
+                                        * ((float) ($item['unit_price'] ?? 0));
+                                });
+
                                 $set('total_amount', $total);
                             }),
                     ]),

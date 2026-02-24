@@ -135,8 +135,8 @@
         </p>
         
         <p style="margin-top: 10px; font-size: 12px;">
-            Silakan transfer pembayaran ke:<br>
-            <strong>BCA 1234567890 a.n {{ $order->business->name }}</strong>
+            Silakan konfirmasi pembayaran ke:<br>
+            <strong> {{ $order->business->phone }}</strong>
         </p>
     </div>
 

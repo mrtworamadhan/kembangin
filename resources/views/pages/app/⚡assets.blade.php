@@ -325,7 +325,7 @@ new #[Layout('layouts::pwa')] class extends Component {
         $this->validate([
             'goalName' => 'required|string|max:255',
             'goalTargetAmount' => 'required|numeric|min:1',
-            'goalDeadline' => 'nullable|date',
+            'goalDeadline' => 'required|date',
         ]);
 
         if ($this->editGoalId) {
@@ -1027,7 +1027,7 @@ new #[Layout('layouts::pwa')] class extends Component {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-zinc-500 uppercase mb-1">Target Selesai (Opsional)</label>
-                        <input type="date" wire:model="goalDeadline" class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 text-sm">
+                        <input type="date" wire:model="goalDeadline" required class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 text-sm">
                     </div>
                     <div class="flex gap-3 pt-2">
                         <button type="button" wire:click="$set('showGoalModal', false)" class="flex-1 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-bold text-sm">Batal</button>

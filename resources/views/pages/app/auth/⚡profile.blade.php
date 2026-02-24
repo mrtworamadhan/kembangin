@@ -5,6 +5,17 @@ use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use App\Models\Account;
+use App\Models\Transaction;
+use \App\Models\Business;
+use App\Models\Budget;
+use App\Models\Customer;
+use App\Models\Supplier;
+use App\Models\Goal;
+use App\Models\Purchase;
+use App\Models\Order;
+use App\Models\Product;
+
 
 new #[Layout('layouts::auth')] class extends Component {
     
@@ -47,6 +58,76 @@ new #[Layout('layouts::auth')] class extends Component {
 
         $this->reset('current_password', 'password', 'password_confirmation');
         session()->flash('password_message', 'Password berhasil diperbarui!');
+    }
+
+    // public function resetSemuaData()
+    // {
+    //     $userId = Auth::id();
+
+    //     Transaction::where('user_id', $userId)->delete();
+    //     Account::where('user_id', $userId)->update(['balance' => 0, 'opening_balance' => 0,]);
+    //     Budget::where('user_id', $userId)->delete(); 
+    //     Goal::where('user_id', $userId)->delete();
+    //     Account::where('user_id', $userId)->delete();
+
+    //     // --- 2. RESET PANEL BISNIS ---
+    //     // Asumsi data bisnis juga terikat dengan user_id atau tenant_id (sesuaikan jika perlu)
+    //     Purchase::where('user_id', $userId)->delete();
+    //     Order::where('user_id', $userId)->delete();
+    //     Product::where('user_id', $userId)->delete();
+
+    //     // --- 3. KEMBALIKAN KE STATUS AWAL ---
+    //     Auth::user()->update(['has_seen_tour' => false]);
+
+    //     session()->flash('profile_message', 'BOOM! 💥 Semua data transaksi berhasil direset. Mari mulai lembaran baru!');
+        
+    //     return redirect()->route('app.home');
+    // }
+
+    public function resetSemuaData()
+    {
+        $userId = Auth::id();
+
+        $businessIds = Business::where('user_id', $userId)->pluck('id');
+        $orderIds = Order::whereIn('business_id', $businessIds)->pluck('id');
+        $purchaseIds = Purchase::whereIn('business_id', $businessIds)->pluck('id');
+
+        
+        if ($businessIds->isNotEmpty()) {
+            if ($orderIds->isNotEmpty()) {
+                \App\Models\OrderItem::whereIn('order_id', $orderIds)->delete();
+            }
+            if ($purchaseIds->isNotEmpty()) {
+                \App\Models\PurchaseItem::whereIn('purchase_id', $purchaseIds)->delete();
+            }
+
+            Purchase::whereIn('business_id', $businessIds)->delete();
+            Order::whereIn('business_id', $businessIds)->delete();
+            Product::whereIn('business_id', $businessIds)->delete();
+            Customer::whereIn('business_id', $businessIds)->delete();
+            Supplier::whereIn('business_id', $businessIds)->delete();
+            Account::whereIn('business_id', $businessIds)->delete();
+
+            Transaction::whereIn('business_id', $businessIds)->delete();
+
+            Business::where('user_id', $userId)->delete();
+        }
+
+        Transaction::where('user_id', $userId)->delete();
+        Budget::where('user_id', $userId)->delete(); 
+        Goal::where('user_id', $userId)->delete();
+
+        Account::where('user_id', $userId)
+            ->update([
+                'balance' => 0, 
+                'opening_balance' => 0
+            ]);
+
+        Auth::user()->update(['has_seen_tour' => false]);
+
+        session()->flash('profile_message', 'BOOM! 💥 Semua data Bisnis & Personal berhasil dibumihanguskan. Mari mulai lembaran baru!');
+        
+        return redirect()->route('app.home');
     }
 };
 ?>
@@ -119,6 +200,117 @@ new #[Layout('layouts::auth')] class extends Component {
                 Ganti Password
             </button>
         </form>
+    </div>
+
+    <div x-data="{ showResetModal: false, confirmText: '' }" class="bg-red-50 dark:bg-red-900/10 p-6 rounded-3xl border border-red-200 dark:border-red-800/50 relative overflow-hidden">
+        
+        <div class="absolute -right-4 -top-4 opacity-10">
+            <x-heroicon-s-exclamation-triangle class="w-32 h-32 text-red-600" />
+        </div>
+
+        <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-bold text-red-800 dark:text-red-400 mb-1 flex items-center gap-2">
+                    <x-heroicon-o-exclamation-triangle class="w-5 h-5" /> Zona Berbahaya
+                </h3>
+                <p class="text-[11px] text-red-600 dark:text-red-300 font-medium leading-relaxed max-w-sm">
+                    Tindakan ini akan menghapus seluruh data transaksi personal dan bisnis Anda secara permanen.
+                </p>
+            </div>
+            
+            <button @click="showResetModal = true" type="button" class="w-full sm:w-auto px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition shadow-sm whitespace-nowrap">
+                Hapus & Mulai dari Nol
+            </button>
+        </div>
+
+        <div 
+            x-show="showResetModal" 
+            style="display: none;"
+            class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0"
+            x-cloak
+        >
+            <div 
+                x-show="showResetModal"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm"
+                @click="showResetModal = false; confirmText = ''"
+            ></div>
+
+            <div 
+                x-show="showResetModal"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                class="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden border border-zinc-100 dark:border-zinc-800"
+            >
+                <div class="p-6">
+                    <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mb-4 border-4 border-red-50 dark:border-red-900/10">
+                        <x-heroicon-s-trash class="w-6 h-6" />
+                    </div>
+                    
+                    <h3 class="text-lg font-extrabold text-zinc-900 dark:text-white mb-2">Peringatan Penghapusan Data!</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4 leading-relaxed">
+                        Anda akan melakukan reset pabrik pada akun ini. Tindakan ini <b>tidak dapat dibatalkan</b> dan akan menghapus data berikut:
+                    </p>
+
+                    <div class="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 mb-5 border border-zinc-100 dark:border-zinc-800 space-y-3">
+                        <div>
+                            <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Panel Personal</p>
+                            <ul class="text-xs text-zinc-600 dark:text-zinc-300 space-y-1.5 pl-4 list-disc marker:text-red-400">
+                                <li>Seluruh Riwayat Transaksi (Pemasukan, Pengeluaran, Transfer)</li>
+                                <li>Saldo Dompet/Rekening (Dikembalikan menjadi Rp 0)</li>
+                                <li>Target Impian (Goals) dan Budget Rutin</li>
+                            </ul>
+                        </div>
+                        <div class="pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                            <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Panel Bisnis</p>
+                            <ul class="text-xs text-zinc-600 dark:text-zinc-300 space-y-1.5 pl-4 list-disc marker:text-red-400">
+                                <li>Riwayat Invoice dan Purchasing (Pembelian)</li>
+                                <li>Data Produk dan Stok Inventory (Dikosongkan)</li>
+                                <li>Seluruh Transaksi Operasional Bisnis</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mb-5">
+                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">
+                            Ketik kata <span class="text-red-600 font-black tracking-widest bg-red-50 dark:bg-red-900/30 px-1 py-0.5 rounded">RESET</span> untuk mengonfirmasi:
+                        </label>
+                        <input 
+                            type="text" 
+                            x-model="confirmText" 
+                            placeholder="Ketik RESET di sini..." 
+                            class="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 text-sm placeholder:text-zinc-400 text-center font-bold tracking-widest uppercase"
+                        >
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button 
+                            @click="showResetModal = false; confirmText = ''" 
+                            class="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                        >
+                            Batal
+                        </button>
+                        <button 
+                            @click="if(confirmText === 'RESET') { $wire.resetSemuaData(); } else { alert('Kata kunci tidak cocok.'); }"
+                            :disabled="confirmText !== 'RESET'"
+                            :class="confirmText === 'RESET' ? 'bg-red-600 hover:bg-red-700 text-white shadow-md' : 'bg-red-300 dark:bg-red-900/50 text-red-100 cursor-not-allowed'"
+                            class="flex-1 py-3 font-bold rounded-xl text-xs transition"
+                        >
+                            Ya, Hapus Semua
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="pt-4">

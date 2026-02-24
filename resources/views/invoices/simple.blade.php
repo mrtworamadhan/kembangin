@@ -6,14 +6,12 @@
     <style>
         body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 13px; color: #555; }
         
-        /* Header Minimalis Kiri-Kanan */
         .header-table { width: 100%; margin-bottom: 40px; }
         .brand-name { font-size: 20px; font-weight: bold; color: {{ $color }}; letter-spacing: 1px; }
         
         .invoice-title { font-size: 40px; font-weight: 300; color: #ddd; text-align: right; line-height: 1; }
         .invoice-number { font-size: 14px; color: #888; text-align: right; }
 
-        /* Tabel Item Clean (Tanpa Garis Vertikal) */
         .items-table { width: 100%; border-collapse: collapse; margin-top: 30px; }
         .items-table th { text-align: left; padding: 10px 0; border-bottom: 2px solid #eee; color: #888; text-transform: uppercase; font-size: 11px; }
         .items-table td { padding: 15px 0; border-bottom: 1px solid #eee; }

@@ -403,7 +403,7 @@ new #[Layout('layouts::pwa')] class extends Component {
                     </div>
 
                     <div class="space-y-3 relative z-10 border-t border-dashed border-zinc-200 dark:border-zinc-700 pt-4">
-                        <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Top 5 Kebocoran Bulan Ini:</p>
+                        <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Top 5 Konsumtif Bulan Ini:</p>
                         @forelse($topConsumptiveCategories as $top)
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-2 w-2/3">
@@ -422,7 +422,7 @@ new #[Layout('layouts::pwa')] class extends Component {
             @if($consPct > 50)
                 <div class="p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-2xl flex gap-3 shadow-sm mt-4">
                     <x-heroicon-o-exclamation-triangle class="w-6 h-6 text-red-600 shrink-0" />
-                    <p class="text-xs text-red-700 dark:text-red-400 font-medium leading-relaxed">Lebih dari separuh uangmu ({{ $consPct }}%) hangus untuk kebutuhan konsumtif! Cek Top 5 di atas dan kurangi jajan.</p>
+                    <p class="text-xs text-red-700 dark:text-red-400 font-medium leading-relaxed">Lebih dari separuh uangmu ({{ $consPct }}%) hangus untuk kebutuhan konsumtif! Cek Top pengeluaran Konsumtif.</p>
                 </div>
             @endif
 

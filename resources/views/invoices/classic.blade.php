@@ -9,11 +9,9 @@
         .header { text-align: center; margin-bottom: 20px; border-bottom: 3px double {{ $color }}; padding-bottom: 15px; }
         .title { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: {{ $color }}; }
         
-        /* Tabel Info */
         .info-table { width: 100%; margin-bottom: 20px; }
         .info-label { font-weight: bold; width: 100px; }
         
-        /* Tabel Item dengan Border Penuh */
         .items-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .items-table th, .items-table td { 
             border: 1px solid #000; 
