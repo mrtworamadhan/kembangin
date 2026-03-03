@@ -14,16 +14,18 @@ class OrderItemObserver
             ->latest('id')
             ->first();
 
+        $basePriceDefault = Product::where('product_id', $orderItem->product_id);
+
         $basePrice = $latestPurchase 
             ? $latestPurchase->unit_cost 
-            : ($orderItem->product->base_price ?? 0);
+            : ($orderItem->product->base_price ?? $basePriceDefault?? 0);
 
         $orderItem->sale_price = $orderItem->unit_price;    
         $orderItem->base_price = $basePrice;
         $orderItem->total_base_price = $basePrice * $orderItem->quantity;
 
         if (!$orderItem->sale_price) {
-            $orderItem->sale_price = $orderItem->product->sale_price ?? 0;
+            $orderItem->sale_price = $orderItem->product->sale_price ?? $basePriceDefault?? 0;
         }
     }
 }

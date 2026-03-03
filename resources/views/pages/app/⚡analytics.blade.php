@@ -150,7 +150,7 @@ new #[Layout('layouts::pwa')] class extends Component {
         // ==========================================
         $selectedBizData = [
             'modalAwal' => 0, 'sales' => 0, 'hpp' => 0, 'opEx' => 0, 'totalExpense' => 0, 
-            'profit' => 0, 'withdraw' => 0, 'sisaProfit' => 0, 'piutang' => 0, 'hutang' => 0, 
+            'profit' => 0, 'withdraw' => 0,'total_profit' => 0, 'sisaProfit' => 0, 'piutang' => 0, 'hutang' => 0, 
             'kas' => 0, 'healthStatus' => 'sehat', 'healthMessage' => ''
         ];
 
@@ -194,6 +194,7 @@ new #[Layout('layouts::pwa')] class extends Component {
             $withdrawAllTime = Transaction::where('business_id', $this->selectedBusinessId)->where('date', '<=', $end)
                 ->whereHas('category', fn($q) => $q->where('name', 'Penarikan Prive / Deviden'))->sum('amount');
 
+            $totalProfit = $totalSalesAllTime - ($totalHppAllTime + $totalOpExAllTime);    
             $sisaProfit = ($totalSalesAllTime - ($totalHppAllTime + $totalOpExAllTime)) - $withdrawAllTime;
 
             // D. Kas & Likuiditas (Real-time saat ini)
@@ -223,7 +224,7 @@ new #[Layout('layouts::pwa')] class extends Component {
             $selectedBizData = [
                 'modalAwal' => $modalAwal, 'sales' => $sales, 'hpp' => $hpp, 'opEx' => $opEx, 
                 'totalExpense' => $hpp + $opEx, 'profit' => $profit, 'withdraw' => $withdrawAllTime, 
-                'sisaProfit' => $sisaProfit, 'piutang' => $piutang, 'hutang' => $hutang, 
+                'sisaProfit' => $sisaProfit, 'total_profit' => $totalProfit, 'piutang' => $piutang, 'hutang' => $hutang, 
                 'kas' => $kasBisnis, 'healthStatus' => $healthStatus, 'healthMessage' => $healthMessage
             ];
         }
@@ -532,18 +533,32 @@ new #[Layout('layouts::pwa')] class extends Component {
                 </div>
 
                 <div class="bg-white dark:bg-zinc-800 rounded-3xl shadow-sm border border-zinc-100 dark:border-zinc-700 overflow-hidden">
-                    <div class="p-4 border-b border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                    <div class="p-4 border-b border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center">
                         <h4 class="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                            <x-heroicon-o-banknotes class="w-4 h-4 text-purple-500" /> Arus Deviden / Prive
+                            <x-heroicon-o-banknotes class="w-4 h-4 text-purple-500" /> Ekuitas & Dividen
                         </h4>
+                        <span class="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-700 text-[9px] font-bold rounded-full text-zinc-500 uppercase">Cumulative</span>
                     </div>
                     <div class="p-5 space-y-3">
                         <div class="flex justify-between items-center">
-                            <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Total Ditarik Owner</p>
+                            <div>
+                                <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Total Laba</p>
+                                <p class="text-[10px] text-zinc-400 italic">Akumulasi sejak awal</p>
+                            </div>
+                            <p class="text-sm font-bold text-green-600 dark:text-green-400"> Rp {{ number_format($bizData['total_profit'], 0, ',', '.') }}</p>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Total Prive Diambil</p>
+                                <p class="text-[10px] text-zinc-400 italic">Akumulasi sejak awal</p>
+                            </div>
                             <p class="text-sm font-bold text-purple-600 dark:text-purple-400">- Rp {{ number_format($bizData['withdraw'], 0, ',', '.') }}</p>
                         </div>
                         <div class="flex justify-between items-center pt-2 border-t border-dashed border-zinc-200 dark:border-zinc-700">
-                            <p class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">Sisa Laba Ditahan (Utk Bisnis)</p>
+                            <div>
+                                <p class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">Laba Ditahan Saat Ini</p>
+                                <p class="text-[10px] text-zinc-400 italic">Cadangan modal bisnis</p>
+                            </div>
                             <p class="text-sm font-extrabold {{ $bizData['sisaProfit'] >= 0 ? 'text-zinc-800 dark:text-zinc-100' : 'text-red-600' }}">
                                 Rp {{ number_format($bizData['sisaProfit'], 0, ',', '.') }}
                             </p>
