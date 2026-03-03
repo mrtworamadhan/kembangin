@@ -31,21 +31,6 @@ class FinanceStats extends BaseWidget implements HasForms
         return 'Rekap Order Bulan Berjalan';
     }
 
-
-    public function getFiltersForm(): Schema
-    {
-        return Schema::make($this)
-            ->schema([
-                Section::make()
-                    ->schema([
-                        \Filament\Forms\Components\DatePicker::make('startDate')
-                            ->default(now()->startOfMonth()),
-                        \Filament\Forms\Components\DatePicker::make('endDate')
-                            ->default(now()),
-                    ])->columns(2),
-            ]);
-    }
-
     protected function getStats(): array
     {
         $tenantId = Filament::getTenant()->id;
@@ -68,6 +53,14 @@ class FinanceStats extends BaseWidget implements HasForms
             ->sum('total_amount');
 
         $totalSales = $salesPaid + $salesUnpaid;
+
+        $purchaseUnpaid = Purchase::where('business_id', $tenantId)
+
+            ->where('payment_status', 'unpaid')
+
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+
+            ->sum('total_amount');
 
         $totalHpp = \Illuminate\Support\Facades\DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
@@ -92,6 +85,28 @@ class FinanceStats extends BaseWidget implements HasForms
         $totalPrive = Transaction::where('business_id', $tenantId)
             ->whereHas('category', fn ($q) => $q->where('name', 'Penarikan Prive / Deviden'))
             ->sum('amount');
+        
+        $totalSalesAllTime = Order::where('business_id', $tenantId)->sum('total_amount');
+
+        $totalHppAllTime = \Illuminate\Support\Facades\DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->where('orders.business_id', $tenantId)
+            ->sum('order_items.total_base_price');
+
+        $totalOpExAllTime = Transaction::where('business_id', $tenantId)
+            ->whereHas('category', function ($q) {
+                $q->where('type', 'expense')
+                ->whereNotIn('name', [
+                    'Bahan Baku / Pembelian Stok',
+                    'Penarikan Prive / Deviden',
+                    'Transfer Keluar'
+                ]);
+            })
+            ->sum('amount');
+
+        $totalProfitAllTime = $totalSalesAllTime - $totalHppAllTime - $totalOpExAllTime;
+
+        $sisaProfit = $totalProfitAllTime - $totalPrive;
 
         $formatRp = fn ($val) => 'Rp ' . number_format($val, 0, ',', '.');
 
@@ -112,15 +127,19 @@ class FinanceStats extends BaseWidget implements HasForms
                 ->chart([7, 3, 10, 5, 12, 10]),
 
             Stat::make('HPP / COGS', $formatRp($totalHpp))
-                ->description('Modal barang terjual')
-                ->descriptionIcon('heroicon-m-shopping-cart')
-                ->color('gray'),
+                ->description(new HtmlString(
+                    '<div class="mt-1 text-xs">
+                        <span class="text-warning-600">⏳ Hutang: ' . $formatRp($purchaseUnpaid) . '</span>
+                    </div>'
+                ))
+                ->color('danger'),
 
             Stat::make('Profit Bersih (Bulan Ini)', $formatRp($estimatedProfit))
                 ->description(new HtmlString(
                     '<div class="mt-1 text-xs">
-                        <span class="text-gray-500">Beban Ops: ' . $formatRp($operationalExpense) . '</span><br>
-                        <span class="text-purple-600">Total Prive: ' . $formatRp($totalPrive) . '</span>
+                        <span class="text-gray-500">Total Est. Profit : ' . $formatRp($totalProfitAllTime) . '</span><br>
+                        <span class="text-purple-600">Total Penarikan: ' . $formatRp($totalPrive) . '</span><br>
+                        <span class="text-purple-600">Profit Ditahan: ' . $formatRp($sisaProfit) . '</span>
                     </div>'
                 ))
                 ->color($estimatedProfit >= 0 ? 'success' : 'danger')
