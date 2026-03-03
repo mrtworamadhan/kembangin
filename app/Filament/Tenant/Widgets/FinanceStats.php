@@ -7,12 +7,17 @@ use App\Models\Purchase;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\HtmlString; // Import ini untuk HTML custom
 
-class FinanceStats extends BaseWidget
+class FinanceStats extends BaseWidget implements HasForms
 {
+    use InteractsWithForms;
     protected static ?int $sort = 1;
     protected ?string $pollingInterval = '15s';
 
@@ -23,47 +28,52 @@ class FinanceStats extends BaseWidget
 
     protected function getDescription(): ?string
     {
-        return 'Rekap Order Tahun Buku Berjalan';
+        return 'Rekap Order Bulan Berjalan';
+    }
+
+
+    public function getFiltersForm(): Schema
+    {
+        return Schema::make($this)
+            ->schema([
+                Section::make()
+                    ->schema([
+                        \Filament\Forms\Components\DatePicker::make('startDate')
+                            ->default(now()->startOfMonth()),
+                        \Filament\Forms\Components\DatePicker::make('endDate')
+                            ->default(now()),
+                    ])->columns(2),
+            ]);
     }
 
     protected function getStats(): array
     {
         $tenantId = Filament::getTenant()->id;
-        $startOfYear = Carbon::now()->startOfYear();
-        $endOfYear = Carbon::now()->endOfYear();
+        
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth = Carbon::now()->endOfMonth();
 
         $modal = Transaction::where('business_id', $tenantId)
-            ->whereHas('category', function ($q) {
-                $q->where('type', 'income')
-                ->where('name', [
-                    'Suntikan Modal Tambahan',
-                ]);
-            })
+            ->whereHas('category', fn ($q) => $q->where('name', 'Suntikan Modal Tambahan'))
             ->sum('amount');
 
         $salesPaid = Order::where('business_id', $tenantId)
             ->where('payment_status', 'paid')
-            ->whereBetween('order_date', [$startOfYear, $endOfYear])
+            ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
             ->sum('total_amount');
 
         $salesUnpaid = Order::where('business_id', $tenantId)
             ->where('payment_status', 'unpaid')
-            ->whereBetween('order_date', [$startOfYear, $endOfYear])
+            ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
             ->sum('total_amount');
 
         $totalSales = $salesPaid + $salesUnpaid;
 
-        $purchasePaid = Purchase::where('business_id', $tenantId)
-            ->where('payment_status', 'paid')
-            ->whereBetween('date', [$startOfYear, $endOfYear])
-            ->sum('total_amount');
-
-        $purchaseUnpaid = Purchase::where('business_id', $tenantId)
-            ->where('payment_status', 'unpaid')
-            ->whereBetween('date', [$startOfYear, $endOfYear])
-            ->sum('total_amount');
-
-        $totalPurchase = $purchasePaid + $purchaseUnpaid;
+        $totalHpp = \Illuminate\Support\Facades\DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->where('orders.business_id', $tenantId)
+            ->whereBetween('orders.order_date', [$startOfMonth, $endOfMonth])
+            ->sum('order_items.total_base_price');
 
         $operationalExpense = Transaction::where('business_id', $tenantId)
             ->whereHas('category', function ($q) {
@@ -74,82 +84,47 @@ class FinanceStats extends BaseWidget
                     'Transfer Keluar'
                 ]);
             })
-            ->whereBetween('date', [$startOfYear, $endOfYear])
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->sum('amount');
 
-        $prive = Transaction::where('business_id', $tenantId)
-            ->whereHas('category', function ($q) {
-                $q->where('type', 'expense')
-                ->where('name', 'Penarikan Prive / Deviden');
-            })
-            ->whereBetween('date', [$startOfYear, $endOfYear])
-            ->sum('amount');
+        $estimatedProfit = $totalSales - $totalHpp - $operationalExpense;
 
-        $estimatedProfit = $totalSales - $totalPurchase - $operationalExpense - $prive;
+        $totalPrive = Transaction::where('business_id', $tenantId)
+            ->whereHas('category', fn ($q) => $q->where('name', 'Penarikan Prive / Deviden'))
+            ->sum('amount');
 
         $formatRp = fn ($val) => 'Rp ' . number_format($val, 0, ',', '.');
 
-        $newOrders = Order::where('business_id', $tenantId)
-            ->whereBetween('order_date', [$startOfYear, $endOfYear])
-            ->count();
-        
         return [
             Stat::make('Modal Usaha', $formatRp($modal))
-                ->description('Total Modal Usaha')
+                ->description('Total investasi owner')
                 ->descriptionIcon('heroicon-m-circle-stack')
-                ->chart([7, 2, 10, 3, 15, 4, 17])
                 ->color('warning'),
 
-            Stat::make('Total Penjualan (Sales)', $formatRp($totalSales))
+            Stat::make('Penjualan (Bulan Ini)', $formatRp($totalSales))
                 ->description(new HtmlString(
-                    '<div class="mt-1 space-y-1 text-xs">
-                        <div class="flex justify-between text-success-600">
-                            <span>✅ Lunas:</span>
-                            <span class="font-bold">' . $formatRp($salesPaid) . '</span>
-                        </div>
-                        <div class="flex justify-between text-warning-600">
-                            <span>⏳ Piutang:</span>
-                            <span class="font-bold">' . $formatRp($salesUnpaid) . '</span>
-                        </div>
+                    '<div class="mt-1 text-xs">
+                        <span class="text-success-600">✅ Lunas: ' . $formatRp($salesPaid) . '</span><br>
+                        <span class="text-warning-600">⏳ Piutang: ' . $formatRp($salesUnpaid) . '</span>
                     </div>'
                 ))
                 ->color('success')
                 ->chart([7, 3, 10, 5, 12, 10]),
 
-            Stat::make('Total Belanja (Purchase)', $formatRp($totalPurchase))
+            Stat::make('HPP / COGS', $formatRp($totalHpp))
+                ->description('Modal barang terjual')
+                ->descriptionIcon('heroicon-m-shopping-cart')
+                ->color('gray'),
+
+            Stat::make('Profit Bersih (Bulan Ini)', $formatRp($estimatedProfit))
                 ->description(new HtmlString(
-                    '<div class="mt-1 space-y-1 text-xs">
-                        <div class="flex justify-between text-gray-600">
-                            <span>✅ Lunas:</span>
-                            <span class="font-bold">' . $formatRp($purchasePaid) . '</span>
-                        </div>
-                        <div class="flex justify-between text-danger-600">
-                            <span>⏳ Hutang:</span>
-                            <span class="font-bold">' . $formatRp($purchaseUnpaid) . '</span>
-                        </div>
+                    '<div class="mt-1 text-xs">
+                        <span class="text-gray-500">Beban Ops: ' . $formatRp($operationalExpense) . '</span><br>
+                        <span class="text-purple-600">Total Prive: ' . $formatRp($totalPrive) . '</span>
                     </div>'
                 ))
-                ->color('danger')
-                ->chart([10, 5, 8, 2, 5, 12]),
-
-            Stat::make('Estimasi Profit (Net)', $formatRp($estimatedProfit))
-                ->description(new HtmlString(
-                    '
-                        <div class="mt-1 space-y-1 text-xs">
-                            <div class="flex justify-between text-gray-600">
-                                <span>Beban Ops:</span>
-                                <span class="font-bold">'. $formatRp($operationalExpense) .'</span>
-                            </div>
-                            <div class="flex justify-between text-danger-600">
-                                <span>Dividen:</span>
-                                <span class="font-bold">' . $formatRp($prive) . '</span>
-                            </div>
-                        </div>
-                    '
-                ))
                 ->color($estimatedProfit >= 0 ? 'success' : 'danger')
-                ->chart($estimatedProfit >= 0 ? [1, 2, 5, 8, 10] : [10, 8, 5, 2, 1]),
-
+                ->chart($estimatedProfit >= 0 ? [1, 3, 5, 8, 12] : [12, 8, 5, 3, 1]),
         ];
     }
 }
