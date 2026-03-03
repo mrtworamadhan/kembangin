@@ -32,6 +32,15 @@ class FinanceStats extends BaseWidget
         $startOfYear = Carbon::now()->startOfYear();
         $endOfYear = Carbon::now()->endOfYear();
 
+        $modal = Transaction::where('business_id', $tenantId)
+            ->whereHas('category', function ($q) {
+                $q->where('type', 'income')
+                ->where('name', [
+                    'Suntikan Modal Tambahan',
+                ]);
+            })
+            ->sum('amount');
+
         $salesPaid = Order::where('business_id', $tenantId)
             ->where('payment_status', 'paid')
             ->whereBetween('order_date', [$startOfYear, $endOfYear])
@@ -85,6 +94,12 @@ class FinanceStats extends BaseWidget
             ->count();
         
         return [
+            Stat::make('Modal Usaha', $formatRp($modal))
+                ->description('Total Modal Usaha')
+                ->descriptionIcon('heroicon-m-circle-stack')
+                ->chart([7, 2, 10, 3, 15, 4, 17])
+                ->color('warning'),
+
             Stat::make('Total Penjualan (Sales)', $formatRp($totalSales))
                 ->description(new HtmlString(
                     '<div class="mt-1 space-y-1 text-xs">
@@ -135,10 +150,6 @@ class FinanceStats extends BaseWidget
                 ->color($estimatedProfit >= 0 ? 'success' : 'danger')
                 ->chart($estimatedProfit >= 0 ? [1, 2, 5, 8, 10] : [10, 8, 5, 2, 1]),
 
-            Stat::make('Total Order', $newOrders)
-                ->description('Pesanan Tahun Ini')
-                ->descriptionIcon('heroicon-m-shopping-cart')
-                ->color('info'),
         ];
     }
 }

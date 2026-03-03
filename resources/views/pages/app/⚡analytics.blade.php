@@ -17,6 +17,10 @@ new #[Layout('layouts::pwa')] class extends Component {
     public string $analyticMode = 'personal'; 
     public ?int $selectedBusinessId = null;
 
+    // STATE: FILTER TANGGAL
+    public int $selectedMonth;
+    public int $selectedYear;
+
     // STATE: MODAL RINCIAN
     public bool $showDetailModal = false;
     public string $detailModalTitle = '';
@@ -27,6 +31,10 @@ new #[Layout('layouts::pwa')] class extends Component {
     {
         $user = Auth::user();
         $familyIds = $user->family_ids ?? [$user->id];
+
+        // Default ke bulan & tahun sekarang
+        $this->selectedMonth = (int) now()->month;
+        $this->selectedYear = (int) now()->year;
         
         $firstBusiness = Business::whereHas('users', function($q) use ($familyIds) {
             $q->whereIn('users.id', $familyIds);
@@ -42,33 +50,40 @@ new #[Layout('layouts::pwa')] class extends Component {
         $this->analyticMode = $mode;
     }
 
-    // Fungsi untuk membuka Modal Rincian
+    // Helper untuk mendapatkan range tanggal yang dipilih
+    private function getSelectedRange()
+    {
+        $start = Carbon::create($this->selectedYear, $this->selectedMonth, 1)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        return [$start, $end];
+    }
+
     public function openDetailModal($type)
     {
         $user = Auth::user();
         $familyIds = $user->family_ids ?? [$user->id];
-        $thisMonth = Carbon::now()->startOfMonth();
+        [$start, $end] = $this->getSelectedRange();
 
         $query = Transaction::whereNull('business_id')
             ->whereIn('user_id', $familyIds)
-            ->where('date', '>=', $thisMonth)
+            ->whereBetween('date', [$start, $end])
             ->with(['category', 'account'])
             ->orderBy('amount', 'desc');
 
         if ($type === 'productive_saving') {
-            $this->detailModalTitle = 'Rincian Investasi / Tabungan (Produktif)';
+            $this->detailModalTitle = 'Rincian Investasi / Tabungan';
             $this->detailModalColor = 'text-green-600 dark:text-green-400';
             $this->detailTransactions = (clone $query)->whereHas('category', fn($q) => $q->where('productivity', 'productive')->where('nature', 'saving'))->get();
         } elseif ($type === 'productive_need') {
-            $this->detailModalTitle = 'Rincian SDM / Pendidikan (Produktif)';
+            $this->detailModalTitle = 'Rincian SDM / Pendidikan';
             $this->detailModalColor = 'text-blue-600 dark:text-blue-400';
             $this->detailTransactions = (clone $query)->whereHas('category', fn($q) => $q->where('productivity', 'productive')->where('nature', 'need'))->get();
         } elseif ($type === 'neutral') {
-            $this->detailModalTitle = 'Rincian Kewajiban / Penahan Nilai (Netral)';
+            $this->detailModalTitle = 'Rincian Kewajiban (Netral)';
             $this->detailModalColor = 'text-amber-600 dark:text-amber-400';
             $this->detailTransactions = (clone $query)->whereHas('category', fn($q) => $q->where('productivity', 'neutral'))->get();
         } elseif ($type === 'consumptive') {
-            $this->detailModalTitle = 'Rincian Pengeluaran Hangus (Konsumtif)';
+            $this->detailModalTitle = 'Rincian Pengeluaran Hangus';
             $this->detailModalColor = 'text-red-600 dark:text-red-400';
             $this->detailTransactions = (clone $query)->whereHas('category', fn($q) => $q->where('productivity', 'consumptive'))->get();
         }
@@ -79,89 +94,60 @@ new #[Layout('layouts::pwa')] class extends Component {
     public function with(): array
     {
         $user = Auth::user();
-        $thisMonth = Carbon::now()->startOfMonth();
         $familyIds = $user->family_ids ?? [$user->id]; 
+        [$start, $end] = $this->getSelectedRange();
 
         // ==========================================
         // DATA ANALYTICS PERSONAL (KELUARGA)
         // ==========================================
         $personalExpenseQuery = Transaction::whereNull('business_id')
             ->whereIn('user_id', $familyIds)
-            ->where('date', '>=', $thisMonth)
+            ->whereBetween('date', [$start, $end])
             ->whereHas('category', fn($q) => $q->where('type', 'expense')
-                ->whereNotIn('name', [
-                    'Transfer Keluar',
-                ]));
+                ->whereNotIn('name', ['Transfer Keluar']));
 
         $totalPersonalExpense = (clone $personalExpenseQuery)->sum('amount');
 
-        // Variabel Dimensi 1 (Nature)
         $needsTotal = 0; $wantsTotal = 0; $savingsTotal = 0;
-        
-        // Variabel Dimensi 2 (Productivity)
         $productiveTotal = 0; $consumptiveTotal = 0; $neutralTotal = 0;
-
-        // Variabel Pecahan Detail (Untuk Rincian Card)
         $prodSavingTotal = 0; $prodNeedTotal = 0;
         
         $expenses = (clone $personalExpenseQuery)->with('category')->get();
         
         foreach ($expenses as $ex) {
             $cat = $ex->category;
-            
-            // 1. Hitung Berdasarkan Prioritas (Nature)
             if ($cat->nature === 'need') $needsTotal += $ex->amount;
             elseif ($cat->nature === 'want') $wantsTotal += $ex->amount;
             elseif ($cat->nature === 'saving') $savingsTotal += $ex->amount;
-            else $needsTotal += $ex->amount; // Fallback
 
-            // 2. Hitung Berdasarkan Kualitas (Productivity) & Rincian
             if ($cat->productivity === 'productive') {
                 $productiveTotal += $ex->amount;
-                // Pecah produktif
                 if ($cat->nature === 'saving') $prodSavingTotal += $ex->amount;
                 else $prodNeedTotal += $ex->amount;
-            } 
-            elseif ($cat->productivity === 'consumptive') {
+            } elseif ($cat->productivity === 'consumptive') {
                 $consumptiveTotal += $ex->amount;
-            } 
-            elseif ($cat->productivity === 'neutral') {
+            } elseif ($cat->productivity === 'neutral') {
                 $neutralTotal += $ex->amount;
-            } 
-            else {
-                $consumptiveTotal += $ex->amount; // Fallback
             }
         }
 
-        // Persentase Prioritas (Nature)
         $needsPct = $totalPersonalExpense > 0 ? round(($needsTotal / $totalPersonalExpense) * 100) : 0;
         $wantsPct = $totalPersonalExpense > 0 ? round(($wantsTotal / $totalPersonalExpense) * 100) : 0;
         $savingsPct = $totalPersonalExpense > 0 ? round(($savingsTotal / $totalPersonalExpense) * 100) : 0;
-
-        // Persentase Kualitas (Productivity)
         $prodPct = $totalPersonalExpense > 0 ? round(($productiveTotal / $totalPersonalExpense) * 100) : 0;
         $consPct = $totalPersonalExpense > 0 ? round(($consumptiveTotal / $totalPersonalExpense) * 100) : 0;
         $neutPct = $totalPersonalExpense > 0 ? round(($neutralTotal / $totalPersonalExpense) * 100) : 0;
 
-        // Ambil Top 5 Kategori Konsumtif Terbesar
         $topConsumptiveCategories = Transaction::select('category_id', DB::raw('SUM(amount) as total_amount'))
             ->whereNull('business_id')
             ->whereIn('user_id', $familyIds)
-            ->where('date', '>=', $thisMonth)
+            ->whereBetween('date', [$start, $end])
             ->whereHas('category', fn($q) => $q->where('type', 'expense')->where('productivity', 'consumptive'))
-            ->groupBy('category_id')
-            ->orderByDesc('total_amount')
-            ->limit(5)
-            ->with('category')
-            ->get();
+            ->groupBy('category_id')->orderByDesc('total_amount')->limit(5)->with('category')->get();
 
         // ==========================================
         // DATA ANALYTICS BISNIS
         // ==========================================
-        $familyBusinesses = Business::whereHas('users', function($q) use ($familyIds) {
-            $q->whereIn('users.id', $familyIds);
-        })->get();
-
         $selectedBizData = [
             'modalAwal' => 0, 'sales' => 0, 'hpp' => 0, 'opEx' => 0, 'totalExpense' => 0, 
             'profit' => 0, 'withdraw' => 0, 'sisaProfit' => 0, 'piutang' => 0, 'hutang' => 0, 
@@ -169,40 +155,58 @@ new #[Layout('layouts::pwa')] class extends Component {
         ];
 
         if ($this->selectedBusinessId) {
+            // A. Saldo Awal & Modal (All Time)
             $saldoAwal = Account::where('business_id', $this->selectedBusinessId)->sum('opening_balance');
             $suntikModalAllTime = Transaction::where('business_id', $this->selectedBusinessId)
                 ->whereHas('category', fn($q) => $q->where('name', 'Suntikan Modal Tambahan'))->sum('amount');
             $modalAwal = $saldoAwal + $suntikModalAllTime;
 
-            $sales = Order::where('business_id', $this->selectedBusinessId)->where('order_date', '>=', $thisMonth)->sum('total_amount');
-            $hpp = Purchase::where('business_id', $this->selectedBusinessId)->where('date', '>=', $thisMonth)->sum('total_amount');
-            $opEx = Transaction::where('business_id', $this->selectedBusinessId)->where('date', '>=', $thisMonth)
+            // B. Performa Bulan Terpilih (Accrual Basis)
+            $sales = Order::where('business_id', $this->selectedBusinessId)->whereBetween('order_date', [$start, $end])->sum('total_amount');
+            
+            // HPP: Hitung dari Snapshot Order Items
+            $hpp = DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->where('orders.business_id', $this->selectedBusinessId)
+                ->whereBetween('orders.order_date', [$start, $end])
+                ->sum('order_items.total_base_price');
+
+            $opEx = Transaction::where('business_id', $this->selectedBusinessId)
+                ->whereBetween('date', [$start, $end])
                 ->whereHas('category', fn($q) => $q->where('type', 'expense')
                     ->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden', 'Transfer Keluar']))
                 ->sum('amount');
-            $totalExpense = $hpp + $opEx;
-            $profit = $sales - $totalExpense;
+            
+            $profit = $sales - ($hpp + $opEx);
 
-            $withdraw = Transaction::where('business_id', $this->selectedBusinessId)->where('date', '>=', $thisMonth)
+            // C. Laba Ditahan (Akumulatif s/d akhir bulan terpilih)
+            $totalSalesAllTime = Order::where('business_id', $this->selectedBusinessId)->where('order_date', '<=', $end)->sum('total_amount');
+            $totalHppAllTime = DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->where('orders.business_id', $this->selectedBusinessId)
+                ->where('orders.order_date', '<=', $end)
+                ->sum('order_items.total_base_price');
+            $totalOpExAllTime = Transaction::where('business_id', $this->selectedBusinessId)->where('date', '<=', $end)
+                ->whereHas('category', fn($q) => $q->where('type', 'expense')
+                    ->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden', 'Transfer Keluar']))
+                ->sum('amount');
+
+            $withdrawAllTime = Transaction::where('business_id', $this->selectedBusinessId)->where('date', '<=', $end)
                 ->whereHas('category', fn($q) => $q->where('name', 'Penarikan Prive / Deviden'))->sum('amount');
-            $sisaProfit = $profit - $withdraw;
 
+            $sisaProfit = ($totalSalesAllTime - ($totalHppAllTime + $totalOpExAllTime)) - $withdrawAllTime;
+
+            // D. Kas & Likuiditas (Real-time saat ini)
+            $bizIncome = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'income')->whereNotIn('name', ['Transfer Masuk', 'Suntikan Modal Tambahan']))->sum('amount');
+            $bizExpense = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Transfer Keluar']))->sum('amount');
+            $kasBisnis = $modalAwal + $bizIncome - $bizExpense;
+            
             $piutang = Order::where('business_id', $this->selectedBusinessId)->where('payment_status', 'unpaid')->sum('total_amount');
             $hutang = Purchase::where('business_id', $this->selectedBusinessId)->where('payment_status', 'unpaid')->sum('total_amount');
 
-            $bizTotalIncome = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'income')
-                ->whereNotIn('name', [
-                    'Transfer Masuk',
-                ]))->sum('amount');
-            $bizTotalExpense = Transaction::where('business_id', $this->selectedBusinessId)->whereHas('category', fn($q) => $q->where('type', 'expense')
-                ->whereNotIn('name', [
-                    'Transfer Keluar',
-                ]))->sum('amount');
-            $kasBisnis = $saldoAwal + $bizTotalIncome - $bizTotalExpense;
-
+            // E. Health Analysis
             $healthStatus = 'sehat';
-            $healthMessage = 'Keuangan bisnis sangat sehat! Kas aman, profit positif, dan penarikan wajar.';
-
+            $healthMessage = 'Bisnis dalam kondisi prima.';
             if ($profit < 0) {
                 $healthStatus = 'sakit';
                 $healthMessage = 'Bisnis merugi bulan ini! Evaluasi harga jual atau pangkas biaya operasional segera.';
@@ -218,31 +222,26 @@ new #[Layout('layouts::pwa')] class extends Component {
 
             $selectedBizData = [
                 'modalAwal' => $modalAwal, 'sales' => $sales, 'hpp' => $hpp, 'opEx' => $opEx, 
-                'totalExpense' => $totalExpense, 'profit' => $profit, 'withdraw' => $withdraw, 
+                'totalExpense' => $hpp + $opEx, 'profit' => $profit, 'withdraw' => $withdrawAllTime, 
                 'sisaProfit' => $sisaProfit, 'piutang' => $piutang, 'hutang' => $hutang, 
                 'kas' => $kasBisnis, 'healthStatus' => $healthStatus, 'healthMessage' => $healthMessage
             ];
         }
 
         return [
-            'userBusinesses' => $familyBusinesses,
+            'userBusinesses' => Business::whereHas('users', fn($q) => $q->whereIn('users.id', $familyIds))->get(),
             'totalPersonalExpense' => $totalPersonalExpense,
-            
-            // Variabel Progress Bar Tetap Ada!
-            'needsTotal' => $needsTotal, 'wantsTotal' => $wantsTotal, 'savingsTotal' => $savingsTotal,
             'needsPct' => $needsPct, 'wantsPct' => $wantsPct, 'savingsPct' => $savingsPct,
-            'productiveTotal' => $productiveTotal, 'consumptiveTotal' => $consumptiveTotal, 'neutralTotal' => $neutralTotal,
             'prodPct' => $prodPct, 'consPct' => $consPct, 'neutPct' => $neutPct,
-
-            // Variabel Pecahan Rincian
-            'prodSavingTotal' => $prodSavingTotal,
-            'prodNeedTotal' => $prodNeedTotal,
+            'prodSavingTotal' => $prodSavingTotal, 'prodNeedTotal' => $prodNeedTotal,
             'topConsumptiveCategories' => $topConsumptiveCategories,
-            
             'bizData' => $selectedBizData,
+            'needsTotal' => $needsTotal, 'wantsTotal' => $wantsTotal, 'savingsTotal' => $savingsTotal,
+            'productiveTotal' => $productiveTotal, 'consumptiveTotal' => $consumptiveTotal, 'neutralTotal' => $neutralTotal,
         ];
     }
 };
+
 ?>
 
 <div class="animate-fade-in space-y-6">
@@ -257,6 +256,21 @@ new #[Layout('layouts::pwa')] class extends Component {
                 <p class="text-sm text-zinc-500 dark:text-zinc-400">Evaluasi kesehatan finansialmu.</p>
             </div>
         </div>
+        <div class="flex items-center justify-end gap-2">
+            <div>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400">Pilih Rentang Data : </p>
+            </div>
+                <select wire:model.live="selectedMonth" class="bg-white dark:bg-zinc-800 border-none text-xs font-bold rounded-lg shadow-sm focus:ring-green-500 py-1.5 px-2">
+                    @foreach(range(1, 12) as $m)
+                        <option value="{{ $m }}">{{ Carbon::create()->month($m)->translatedFormat('F') }}</option>
+                    @endforeach
+                </select>
+                <select wire:model.live="selectedYear" class="bg-white dark:bg-zinc-800 border-none text-xs font-bold rounded-lg shadow-sm focus:ring-green-500 py-1.5 px-2">
+                    @foreach(range(now()->year - 2, now()->year) as $y)
+                        <option value="{{ $y }}">{{ $y }}</option>
+                    @endforeach
+                </select>
+            </div>
 
         <div class="bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl flex w-full border border-zinc-200 dark:border-zinc-700 shadow-sm mt-2 relative">
             <button wire:click="setMode('personal')" class="flex-1 py-2 text-sm font-bold rounded-xl transition-all {{ $analyticMode === 'personal' ? 'bg-white dark:bg-zinc-700 text-green-600 dark:text-green-400 shadow-sm border border-zinc-200 dark:border-zinc-600' : 'text-zinc-500 dark:text-zinc-400' }}">
