@@ -19,7 +19,7 @@ class OrderItemObserver
 
         $basePrice = $latestPurchase 
             ? $latestPurchase->unit_cost 
-            : ($orderItem->product->base_price ?? 0);
+            : ($orderItem->product->cost ?? 0);
 
         $orderItem->sale_price = $orderItem->unit_price;    
         $orderItem->base_price = $basePrice;
