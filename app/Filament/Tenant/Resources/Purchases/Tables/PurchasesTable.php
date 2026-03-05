@@ -23,15 +23,15 @@ class PurchasesTable
     {
         return $table
             ->columns([
-                
+                TextColumn::make('date')
+                    ->date()
+                    ->sortable(),
                 TextColumn::make('supplier.name')
                     ->label('Supplier')
                     ->sortable(),
                 TextColumn::make('number')
                     ->searchable(),
-                TextColumn::make('date')
-                    ->date()
-                    ->sortable(),
+                
                 TextColumn::make('status')
                     ->badge(),
                 TextColumn::make('payment_status')
@@ -39,9 +39,8 @@ class PurchasesTable
                 TextColumn::make('total_amount')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('attachment')
-                    ->searchable(),
             ])
+            ->defaultSort('date', 'desc')
             ->filters([
                 //
             ])

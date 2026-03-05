@@ -25,6 +25,10 @@ class OrdersTable
     {
         return $table
             ->columns([
+                TextColumn::make('order_date')
+                    ->date()
+                    ->sortable(),
+
                 TextColumn::make('number')
                     ->searchable(),
 
@@ -39,13 +43,9 @@ class OrdersTable
                     ->badge(),
                 TextColumn::make('payment_status')
                     ->badge(),
-                TextColumn::make('order_date')
-                    ->date()
-                    ->sortable(),
-                TextColumn::make('due_date')
-                    ->date()
-                    ->sortable(),
+                
             ])
+            ->defaultSort('order_date', 'desc')
             ->filters([
                 //
             ])
@@ -58,11 +58,16 @@ class OrdersTable
                         $business = $record->business;
                         $theme = $record->business->invoice_theme ?? 'modern';
                         $color = $business->invoice_color ?? '#F59E0B';
+                        $accounts = $business->accounts()
+                            ->whereNotNull('account_number')
+                            ->where('account_number', '!=', '')
+                            ->get();
                         
                         $pdf = Pdf::loadView('invoices.' . $theme, [
                             'order' => $record,
                             'color' => $color,    
                             'logo' => $business->logo,
+                            'accounts' => $accounts,
                         ]);
 
                         $pdf->setPaper('a4', 'portrait');

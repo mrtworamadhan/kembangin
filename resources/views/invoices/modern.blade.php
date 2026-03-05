@@ -79,7 +79,7 @@
                     </tr>
                     <tr>
                         <td class="text-right" style="color: #777;">Jatuh Tempo:</td>
-                        <td class="text-right"><strong>{{ \Carbon\Carbon::parse($order->order_date)->addDays(7)->translatedFormat('d F Y') }}</strong></td>
+                        <td class="text-right"><strong>{{ \Carbon\Carbon::parse($order->order_date)->translatedFormat('d F Y') }}</strong></td>
                     </tr>
                 </table>
             </td>
@@ -133,11 +133,22 @@
         <p style="color: #777; font-size: 12px;">
             {{ $order->notes ?? 'Terima kasih telah berbelanja di ' . $order->business->name . '. Silakan lakukan pembayaran sebelum tanggal jatuh tempo.' }}
         </p>
-        
+
         <p style="margin-top: 10px; font-size: 12px;">
             Silakan konfirmasi pembayaran ke:<br>
-            <strong> {{ $order->business->phone }}</strong>
+            <strong>{{ $order->business->phone }}</strong>
         </p>
+
+        @if($accounts->count())
+            <div style="margin-top: 15px; font-size: 12px;">
+                <strong>Pembayaran dapat ditransfer ke rekening:</strong><br>
+
+                @foreach($accounts as $acc)
+                    {{ $acc->name }} - {{ $acc->account_number }}<br>
+                @endforeach
+
+            </div>
+        @endif
     </div>
 
     @if($order->business->signature || $order->business->signer_name)
