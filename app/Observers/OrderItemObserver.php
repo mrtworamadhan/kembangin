@@ -14,11 +14,12 @@ class OrderItemObserver
             ->latest('id')
             ->first();
 
-        $basePriceDefault = Product::where('product_id', $orderItem->product_id);
+        $basePriceDefault = Product::where('id', $orderItem->product_id)
+            ->value('base_price');
 
         $basePrice = $latestPurchase 
             ? $latestPurchase->unit_cost 
-            : ($orderItem->product->base_price ?? $basePriceDefault?? 0);
+            : ($orderItem->product->base_price ?? 0);
 
         $orderItem->sale_price = $orderItem->unit_price;    
         $orderItem->base_price = $basePrice;
