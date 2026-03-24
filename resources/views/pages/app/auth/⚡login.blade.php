@@ -47,7 +47,7 @@ new #[Layout('layouts::auth')] class extends Component {
         <div class="w-64 h-24 flex items-center justify-center mx-auto mb-1 p-2 transform rotate-3">
             <img src="{{ asset('images/brand/logo.png') }}" alt="Kembangin" class="w-full h-full object-contain -rotate-3">
         </div>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">V.1.0-Beta</p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">V.1.1-Beta</p>
     </div>
 
     <div class="bg-white dark:bg-zinc-800 p-8 rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-700 relative overflow-hidden">

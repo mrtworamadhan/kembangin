@@ -67,9 +67,7 @@
                 </div>
             </div>
 
-            <a href="/" class="absolute top-6 left-6 p-2 bg-white dark:bg-zinc-800 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-green-600 dark:hover:text-green-400 transition hover:scale-105 z-50">
-                <x-heroicon-o-arrow-left class="w-5 h-5" />
-            </a>
+            
 
             <main class="relative z-10 w-full max-w-md">
                 {{ $slot }}
