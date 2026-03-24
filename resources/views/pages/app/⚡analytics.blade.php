@@ -1,3 +1,4 @@
+
 <?php
 
 use Livewire\Component;
@@ -5,6 +6,7 @@ use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Transaction;
 use App\Models\Category;
+use App\Models\User;
 use App\Models\Business;
 use App\Models\Order;
 use App\Models\Purchase;
@@ -20,6 +22,8 @@ new #[Layout('layouts::pwa')] class extends Component {
     // STATE: FILTER TANGGAL
     public int $selectedMonth;
     public int $selectedYear;
+
+    public string $trendPeriod = 'monthly';
 
     // STATE: MODAL RINCIAN
     public bool $showDetailModal = false;
@@ -89,6 +93,103 @@ new #[Layout('layouts::pwa')] class extends Component {
         }
 
         $this->showDetailModal = true;
+    }
+
+    private function getTrendData($familyIds)
+    {
+        $labels = [];
+        $series = [];
+
+        $now = Carbon::now();
+        $periods = [];
+
+        if ($this->trendPeriod === 'monthly') {
+            for ($i = 5; $i >= 0; $i--) {
+                $start = $now->copy()->subMonths($i)->startOfMonth();
+                $end = $start->copy()->endOfMonth();
+                $periods[] = ['label' => $start->translatedFormat('M Y'), 'start' => $start, 'end' => $end];
+            }
+        } elseif ($this->trendPeriod === 'quarterly') {
+            for ($i = 3; $i >= 0; $i--) {
+                $start = $now->copy()->subQuarters($i)->firstOfQuarter();
+                $end = $start->copy()->lastOfQuarter();
+                $periods[] = ['label' => 'Q'.$start->quarter.' '.$start->year, 'start' => $start, 'end' => $end];
+            }
+        } elseif ($this->trendPeriod === 'semester') {
+            for ($i = 3; $i >= 0; $i--) {
+                $target = $now->copy()->subMonths($i * 6);
+                $semester = $target->month <= 6 ? 1 : 2;
+                $start = Carbon::create($target->year, $semester == 1 ? 1 : 7, 1)->startOfMonth();
+                $end = Carbon::create($target->year, $semester == 1 ? 6 : 12, 1)->endOfMonth();
+                $periods[] = ['label' => 'Smt '.$semester.' '.$start->year, 'start' => $start, 'end' => $end];
+            }
+        } elseif ($this->trendPeriod === 'yearly') {
+            for ($i = 4; $i >= 0; $i--) {
+                $start = $now->copy()->subYears($i)->startOfYear();
+                $end = $start->copy()->endOfYear();
+                $periods[] = ['label' => $start->year, 'start' => $start, 'end' => $end];
+            }
+        }
+
+        foreach ($periods as $p) {
+            $labels[] = $p['label'];
+        }
+
+        if ($this->analyticMode === 'personal') {
+            $dataPokok = []; $dataGayaHidup = []; $dataTabungan = [];
+
+            foreach ($periods as $p) {
+                $expenses = Transaction::whereNull('business_id')->whereIn('user_id', $familyIds)
+                    ->whereBetween('date', [$p['start'], $p['end']])
+                    ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Transfer Keluar']))
+                    ->with('category')->get();
+
+                $pokok = 0; $gayaHidup = 0; $tabungan = 0;
+                foreach($expenses as $ex) {
+                    if ($ex->category->nature === 'need') $pokok += $ex->amount;
+                    elseif ($ex->category->nature === 'want') $gayaHidup += $ex->amount;
+                    elseif ($ex->category->nature === 'saving') $tabungan += $ex->amount;
+                }
+                
+                $dataPokok[] = $pokok;
+                $dataGayaHidup[] = $gayaHidup;
+                $dataTabungan[] = $tabungan;
+            }
+
+            $series = [
+                ['name' => 'Kebutuhan Pokok', 'data' => $dataPokok],
+                ['name' => 'Gaya Hidup', 'data' => $dataGayaHidup],
+                ['name' => 'Tabungan / Aset', 'data' => $dataTabungan],
+            ];
+
+        } else {
+            $dataOmzet = []; $dataHpp = []; $dataOpex = []; $dataProfit = [];
+
+            if ($this->selectedBusinessId) {
+                foreach ($periods as $p) {
+                    $sales = Order::where('business_id', $this->selectedBusinessId)->whereBetween('order_date', [$p['start'], $p['end']])->sum('total_amount');
+                    $hpp = DB::table('order_items')->join('orders', 'order_items.order_id', '=', 'orders.id')
+                        ->where('orders.business_id', $this->selectedBusinessId)->whereBetween('orders.order_date', [$p['start'], $p['end']])->sum('order_items.total_base_price');
+                    $opex = Transaction::where('business_id', $this->selectedBusinessId)->whereBetween('date', [$p['start'], $p['end']])
+                        ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden', 'Transfer Keluar']))->sum('amount');
+                    $profit = $sales - $hpp - $opex;
+
+                    $dataOmzet[] = $sales;
+                    $dataHpp[] = $hpp;
+                    $dataOpex[] = $opex;
+                    $dataProfit[] = $profit;
+                }
+            }
+
+            $series = [
+                ['name' => 'Omzet (Sales)', 'data' => $dataOmzet],
+                ['name' => 'Profit Bersih', 'data' => $dataProfit],
+                ['name' => 'HPP (Modal)', 'data' => $dataHpp],
+                ['name' => 'Operasional', 'data' => $dataOpex],
+            ];
+        }
+
+        return ['labels' => $labels, 'series' => $series];
     }
 
     public function with(): array
@@ -163,7 +264,6 @@ new #[Layout('layouts::pwa')] class extends Component {
 
             // B. Performa Bulan Terpilih (Accrual Basis)
             $sales = Order::where('business_id', $this->selectedBusinessId)->whereBetween('order_date', [$start, $end])->sum('total_amount');
-            
             // HPP: Hitung dari Snapshot Order Items
             $hpp = DB::table('order_items')
                 ->join('orders', 'order_items.order_id', '=', 'orders.id')
@@ -177,7 +277,7 @@ new #[Layout('layouts::pwa')] class extends Component {
                     ->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden', 'Transfer Keluar']))
                 ->sum('amount');
             
-            $profit = $sales - ($hpp + $opEx);
+            $profit = $sales - $hpp - $opEx;
 
             // C. Laba Ditahan (Akumulatif s/d akhir bulan terpilih)
             $totalSalesAllTime = Order::where('business_id', $this->selectedBusinessId)->where('order_date', '<=', $end)->sum('total_amount');
@@ -229,6 +329,8 @@ new #[Layout('layouts::pwa')] class extends Component {
             ];
         }
 
+        $chartData = $this->getTrendData($familyIds);
+
         return [
             'userBusinesses' => Business::whereHas('users', fn($q) => $q->whereIn('users.id', $familyIds))->get(),
             'totalPersonalExpense' => $totalPersonalExpense,
@@ -239,7 +341,102 @@ new #[Layout('layouts::pwa')] class extends Component {
             'bizData' => $selectedBizData,
             'needsTotal' => $needsTotal, 'wantsTotal' => $wantsTotal, 'savingsTotal' => $savingsTotal,
             'productiveTotal' => $productiveTotal, 'consumptiveTotal' => $consumptiveTotal, 'neutralTotal' => $neutralTotal,
+            'chartData' => $chartData,    
         ];
+    }
+
+    public function downloadReport()
+    {
+        $user = Auth::user();
+        $familyIds = $user->household_id 
+            ? User::where('household_id', $user->household_id)->pluck('id')->toArray() 
+            : [$user->id];
+
+        dd($familyIds);
+        [$start, $end] = $this->getSelectedRange();
+        $monthName = Carbon::create()->month($this->selectedMonth)->translatedFormat('F');
+        $year = $this->selectedYear;
+
+        if ($this->analyticMode === 'business' && $this->selectedBusinessId) {
+            $business = Business::find($this->selectedBusinessId);
+            
+            $sales = Order::where('business_id', $this->selectedBusinessId)->whereBetween('order_date', [$start, $end])->sum('total_amount');
+            $hpp = DB::table('order_items')->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->where('orders.business_id', $this->selectedBusinessId)->whereBetween('orders.order_date', [$start, $end])->sum('order_items.total_base_price');
+            $opEx = Transaction::where('business_id', $this->selectedBusinessId)->whereBetween('date', [$start, $end])
+                ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Bahan Baku / Pembelian Stok', 'Penarikan Prive / Deviden', 'Transfer Keluar']))->sum('amount');
+            
+            $profit = $sales - $hpp - $opEx;
+            $profitMargin = $sales > 0 ? round(($profit / $sales) * 100, 1) : 0;
+
+            $orders = Order::where('business_id', $this->selectedBusinessId)
+                ->whereBetween('order_date', [$start, $end])
+                ->orderBy('order_date', 'asc')
+                ->get();
+
+            $expenses = Transaction::where('business_id', $this->selectedBusinessId)
+                ->whereBetween('date', [$start, $end])
+                ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Penarikan Prive / Deviden', 'Transfer Keluar']))
+                ->with('category')
+                ->orderBy('date', 'asc')
+                ->get();
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.business-monthly', compact(
+                'business', 'monthName', 'year', 'sales', 'hpp', 'opEx', 'profit', 'profitMargin', 'orders', 'expenses'
+            ))->setPaper('a4', 'portrait');
+
+            return response()->streamDownload(fn() => print($pdf->output()), "Laporan-Bisnis-{$business->name}-{$monthName}-{$year}.pdf");
+        
+        } else {
+            
+            $expenses = Transaction::whereNull('business_id')
+                ->whereIn('user_id', $familyIds)
+                ->whereBetween('date', [$start, $end])
+                ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', ['Transfer Keluar']))
+                ->with(['category', 'user']) 
+                ->orderBy('date', 'asc')
+                ->get();
+
+            $totalExpense = $expenses->sum('amount');
+            $needs = $expenses->where('category.nature', 'need')->sum('amount');
+            $wants = $expenses->where('category.nature', 'want')->sum('amount');
+            $savings = $expenses->where('category.nature', 'saving')->sum('amount');
+            $productive = $expenses->where('category.productivity', 'productive')->sum('amount');
+            $consumptive = $expenses->where('category.productivity', 'consumptive')->sum('amount');
+            $neutral = $expenses->where('category.productivity', 'neutral')->sum('amount');
+
+            $incomes = Transaction::whereNull('business_id')
+                ->whereIn('user_id', $familyIds)
+                ->whereBetween('date', [$start, $end])
+                ->whereHas('category', fn($q) => $q->where('type', 'income')->whereNotIn('name', ['Transfer Masuk']))
+                ->with(['category', 'user']) 
+                ->orderBy('date', 'asc')
+                ->get();
+                
+            $totalIncome = $incomes->sum('amount');
+            $netCashflow = $totalIncome - $totalExpense;
+
+            $accounts = Account::whereNull('business_id')
+                ->whereIn('user_id', $familyIds)
+                ->with('user')
+                ->get()->map(function($acc) {
+                    $income = Transaction::where('account_id', $acc->id)
+                        ->whereHas('category', fn($q) => $q->where('type', 'income'))->sum('amount');
+                    $expense = Transaction::where('account_id', $acc->id)
+                        ->whereHas('category', fn($q) => $q->where('type', 'expense'))->sum('amount');
+                    
+                    $acc->current_calculated_balance = ($acc->opening_balance ?? 0) + $income - $expense;
+                    return $acc;
+                });
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.personal-monthly', compact(
+                'monthName', 'year', 'expenses', 'totalExpense',
+                'needs', 'wants', 'savings', 'productive', 'consumptive', 'neutral',
+                'incomes', 'totalIncome', 'netCashflow', 'accounts'
+            ))->setPaper('a4', 'portrait');
+
+            return response()->streamDownload(fn() => print($pdf->output()), "Laporan-Keluarga-{$monthName}-{$year}.pdf");
+        }
     }
 };
 
@@ -258,8 +455,11 @@ new #[Layout('layouts::pwa')] class extends Component {
             </div>
         </div>
         <div class="flex items-center justify-end gap-2">
+            <button wire:click="downloadReport" class="flex items-center gap-1.5 bg-amber-600 text-zinc-100 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-zinc-700 transition shadow-sm mr-2">
+                <x-heroicon-o-document-arrow-down class="w-4 h-4" /> Report
+            </button>
             <div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400">Pilih Rentang Data : </p>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400">Rentang Data : </p>
             </div>
                 <select wire:model.live="selectedMonth" class="bg-white dark:bg-zinc-800 border-none text-xs font-bold rounded-lg shadow-sm focus:ring-green-500 py-1.5 px-2">
                     @foreach(range(1, 12) as $m)
@@ -281,6 +481,148 @@ new #[Layout('layouts::pwa')] class extends Component {
                 Performa Bisnis
             </button>
         </div>
+    </div>
+    <div class="bg-white dark:bg-zinc-800 rounded-3xl shadow-sm border border-zinc-100 dark:border-zinc-700 overflow-hidden mt-6">
+        
+        <div class="p-4 border-b border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
+                    <x-heroicon-o-presentation-chart-line class="w-5 h-5 text-indigo-500" /> 
+                    {{ $analyticMode === 'personal' ? 'Tren Arus Kas Keluarga' : 'Tren Performa Bisnis' }}
+                </h4>
+                <p class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Pantau pergerakan finansial dari waktu ke waktu</p>
+            </div>
+            
+            <div class="w-full sm:w-auto">
+                <select wire:model.live="trendPeriod" class="w-full sm:w-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold rounded-xl shadow-sm focus:ring-indigo-500 py-2 px-3 text-zinc-700 dark:text-zinc-300">
+                    <option value="monthly">Bulanan (6 Bulan Terakhir)</option>
+                    <option value="quarterly">Triwulanan (Per 3 Bulan)</option>
+                    <option value="semester">Semester (Per 6 Bulan)</option>
+                    <option value="yearly">Tahunan (Year to Year)</option>
+                </select>
+            </div>
+        </div>
+        <style>
+            .apexcharts-tooltip {
+                color: #18181b !important; 
+            }
+            .apexcharts-tooltip-title {
+                color: #18181b !important;
+            }
+            .apexcharts-tooltip-text-y-value, 
+            .apexcharts-tooltip-text-y-label {
+                color: #18181b !important;
+            }
+            .apexcharts-legend-text {
+                color: inherit !important;
+            }
+
+            html.dark .apexcharts-tooltip,
+            .dark .apexcharts-tooltip {
+                background-color: #18181b !important; 
+                border: 1px solid #3f3f46 !important;
+                color: #f4f4f5 !important;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
+            }
+            html.dark .apexcharts-tooltip-title,
+            .dark .apexcharts-tooltip-title {
+                background-color: #27272a !important; 
+                border-bottom: 1px solid #3f3f46 !important;
+                color: #f4f4f5 !important;
+            }
+            html.dark .apexcharts-tooltip-text-y-value, 
+            html.dark .apexcharts-tooltip-text-y-label,
+            .dark .apexcharts-tooltip-text-y-value, 
+            .dark .apexcharts-tooltip-text-y-label {
+                color: #f4f4f5 !important;
+            }
+
+            .apexcharts-xcrosshairs, .apexcharts-ycrosshairs {
+                display: none !important;
+            }
+        </style>
+        <div class="p-5">
+            <div
+                wire:key="chart-{{ $analyticMode }}-{{ $trendPeriod }}-{{ $selectedBusinessId }}"
+                x-data="{
+                    chart: null,
+                    init() {
+                        if (typeof ApexCharts === 'undefined') {
+                            const script = document.createElement('script');
+                            script.src = 'https://cdn.jsdelivr.net/npm/apexcharts';
+                            script.onload = () => this.drawChart();
+                            document.head.appendChild(script);
+                        } else {
+                            this.drawChart();
+                        }
+                    },
+                    drawChart() {
+                        let rawData = @js($chartData);
+                        let mode = '{{ $analyticMode }}';
+                        
+                        if (!rawData || !rawData.series) return;
+
+                        let chartColors = mode === 'personal'
+                            ? ['#3b82f6', '#ef4444', '#10b981'] 
+                            : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+
+                        let options = {
+                            chart: {
+                                type: 'area',
+                                height: 320,
+                                toolbar: { show: false },
+                                zoom: { enabled: false },
+                                fontFamily: 'inherit',
+                                animations: { enabled: true, easing: 'easeinout', speed: 800 }
+                            },
+                            colors: chartColors,
+                            series: rawData.series,
+                            xaxis: {
+                                categories: rawData.labels,
+                                tooltip: { enabled: false },
+                                axisBorder: { show: false },
+                                axisTicks: { show: false },
+                                labels: { style: { colors: '#9ca3af', fontSize: '11px', fontWeight: 600 } }
+                            },
+                            yaxis: {
+                                labels: {
+                                    formatter: function (value) {
+                                        if (value >= 1000000) return 'Rp ' + (value / 1000000).toFixed(1) + 'M';
+                                        if (value >= 1000) return 'Rp ' + (value / 1000).toFixed(0) + 'K';
+                                        return 'Rp ' + value;
+                                    },
+                                    style: { colors: '#9ca3af', fontSize: '11px', fontWeight: 600 }
+                                }
+                            },
+                            dataLabels: { enabled: false },
+                            stroke: { curve: 'smooth', width: 3 },
+                            fill: {
+                                type: 'gradient',
+                                gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
+                            },
+                            tooltip: {
+                                y: {
+                                    formatter: function (val) {
+                                        return 'Rp ' + new Intl.NumberFormat('id-ID').format(val)
+                                    }
+                                }
+                            },
+                            legend: { position: 'top', horizontalAlign: 'right', fontSize: '12px', fontWeight: 600 },
+                            grid: { strokeDashArray: 4, borderColor: '#e5e7eb' }
+                        };
+
+                        if (this.chart) {
+                            this.chart.destroy();
+                        }
+                        this.chart = new ApexCharts(this.$refs.canvas, options);
+                        this.chart.render();
+                    }
+                }"
+            >
+                <div x-ref="canvas" class="w-full min-h-[320px]"></div>
+            </div>
+        </div>
+
     </div>
 
     @if($analyticMode === 'personal')
@@ -510,21 +852,50 @@ new #[Layout('layouts::pwa')] class extends Component {
                             <x-heroicon-o-calculator class="w-4 h-4 text-green-500" /> Ringkasan Laba Rugi (Bulan Ini)
                         </h4>
                     </div>
+                    
+                    @php
+                        // Hitung Persentase (Margin) dengan aman
+                        $sales = $bizData['sales'];
+                        $hppPct = $sales > 0 ? round(($bizData['hpp'] / $sales) * 100, 1) : 0;
+                        $opExPct = $sales > 0 ? round(($bizData['opEx'] / $sales) * 100, 1) : 0;
+                        $profitPct = $sales > 0 ? round(($bizData['profit'] / $sales) * 100, 1) : 0;
+                    @endphp
+
                     <div class="p-5 space-y-3">
                         <div class="flex justify-between items-center">
                             <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400">1. Total Penjualan</p>
-                            <p class="text-sm font-bold text-green-600 dark:text-green-400">+ Rp {{ number_format($bizData['sales'], 0, ',', '.') }}</p>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-green-600 dark:text-green-400">+ Rp {{ number_format($sales, 0, ',', '.') }}</p>
+                            </div>
                         </div>
+                        
                         <div class="flex justify-between items-center">
-                            <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400">2. Beli Stok / HPP</p>
+                            <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                2. Beli Stok / HPP
+                                <span class="text-[9px] font-bold bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                                    {{ $hppPct }}%
+                                </span>
+                            </p>
                             <p class="text-sm font-bold text-red-500">- Rp {{ number_format($bizData['hpp'], 0, ',', '.') }}</p>
                         </div>
+                        
                         <div class="flex justify-between items-center pb-3 border-b border-dashed border-zinc-200 dark:border-zinc-700">
-                            <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400">3. Biaya Operasional</p>
+                            <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                3. Biaya Operasional
+                                <span class="text-[9px] font-bold bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                                    {{ $opExPct }}%
+                                </span>
+                            </p>
                             <p class="text-sm font-bold text-red-500">- Rp {{ number_format($bizData['opEx'], 0, ',', '.') }}</p>
                         </div>
+                        
                         <div class="flex justify-between items-center pt-1">
-                            <p class="text-sm font-extrabold text-zinc-800 dark:text-zinc-100 uppercase">4. Estimasi Profit</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-extrabold text-zinc-800 dark:text-zinc-100 uppercase">4. Estimasi Profit</p>
+                                <span class="text-[10px] font-bold {{ $profitPct >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' }} px-2 py-0.5 rounded-full">
+                                    Margin: {{ $profitPct }}%
+                                </span>
+                            </div>
                             <p class="text-lg font-extrabold {{ $bizData['profit'] >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600' }}">
                                 Rp {{ number_format($bizData['profit'], 0, ',', '.') }}
                             </p>

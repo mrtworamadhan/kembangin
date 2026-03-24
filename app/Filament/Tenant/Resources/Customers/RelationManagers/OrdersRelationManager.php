@@ -18,6 +18,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -104,9 +105,17 @@ class OrdersRelationManager extends RelationManager
                 TextColumn::make('order_date')
                     ->date()
                     ->sortable(),
-                TextColumn::make('due_date')
-                    ->date()
-                    ->sortable(),
+                TextColumn::make('total_amount')
+                    ->label('Total Transaksi')
+                    ->numeric()
+                    ->prefix('Rp ')
+                    ->sortable()
+                    ->summarize(
+                        Sum::make()
+                            ->label('Total Pembelanjaan')
+                            ->numeric()
+                            ->prefix('Rp ')
+                    ),
             ])
             ->filters([
                 //

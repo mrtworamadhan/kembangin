@@ -8,7 +8,7 @@ use App\Models\Product;
 
 class OrderItemObserver
 {
-    public function creating(OrderItem $orderItem)
+    public function saving(OrderItem $orderItem)
     {
         $latestPurchase = PurchaseItem::where('product_id', $orderItem->product_id)
             ->latest('id')

@@ -14,6 +14,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -51,10 +52,16 @@ class OrdersTable
             ])
             ->recordActions([
                 Action::make('pdf')
-                    ->label('Download PDF')
+                    ->label('PDF INV')
                     ->icon('heroicon-o-document-arrow-down')
                     ->color('warning')
-                    ->action(function (Order $record) {
+                    ->form([
+                        Toggle::make('show_discount')
+                            ->label('Tampilkan Rincian Diskon?')
+                            ->default(true)
+                            ->helperText('Jika dimatikan, invoice tidak akan menampilkan kata "Diskon". Harga item akan otomatis ditampilkan sebagai Harga Netto.'),
+                    ])
+                    ->action(function (Order $record, array $data) { 
                         $business = $record->business;
                         $theme = $record->business->invoice_theme ?? 'modern';
                         $color = $business->invoice_color ?? '#F59E0B';
@@ -68,6 +75,7 @@ class OrdersTable
                             'color' => $color,    
                             'logo' => $business->logo,
                             'accounts' => $accounts,
+                            'show_discount' => $data['show_discount'], 
                         ]);
 
                         $pdf->setPaper('a4', 'portrait');
@@ -76,61 +84,94 @@ class OrdersTable
                             echo $pdf->output();
                         }, 'Invoice-' . $record->number . '.pdf');
                     }),
+
+                Action::make('kwitansi')
+                    ->label('Kwitansi')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('info')
+                    // Tombol ini HANYA muncul kalau sudah dibayar
+                    ->visible(fn (Order $record) => $record->payment_status === 'paid')
+                    ->form([
+                        Toggle::make('show_discount')
+                            ->label('Tampilkan Harga Diskon?')
+                            ->default(true)
+                            ->helperText('Jika dimatikan, nominal kuitansi akan mencatat total harga normal (seolah tidak ada diskon).'),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        $business = $record->business;
+                        $color = $business->invoice_color ?? '#F59E0B';
+                        
+                        $pdf = Pdf::loadView('invoices.kwitansi', [
+                            'order' => $record,
+                            'color' => $color,    
+                            'logo' => $business->logo,
+                            'show_discount' => $data['show_discount'], 
+                        ]);
+
+                        // Kuitansi biasanya formatnya memanjang (Landscape) ukuran setengah A4 (A5)
+                        $pdf->setPaper('a4', 'landscape');
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->output();
+                        }, 'Kwitansi-' . $record->number . '.pdf');
+                    }),
                 Action::make('send_wa')
-                    ->label('Kirim WA')
-                    ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                    ->label('WA')
+                    ->icon('heroicon-o-chat-bubble-oval-left-ellipsis')
                     ->color('success')
+                    ->form([
+                        Toggle::make('show_discount')
+                            ->label('Tampilkan Rincian Diskon di PDF?')
+                            ->default(true),
+                    ])
                     ->requiresConfirmation()
                     ->modalHeading('Kirim Invoice via WhatsApp?')
-                    ->modalDescription('Sistem akan membuatkan link PDF dan mengarahkan Anda ke WhatsApp Web/App.')
-                    ->action(function (Order $record) {
+                    ->modalDescription('Pilih format invoice, lalu sistem akan membuatkan link PDF dan mengarahkan Anda ke WhatsApp.')
+                    ->action(function (Order $record, array $data) { 
                         
-                        // 1. Ambil Data (Sama seperti fungsi download)
                         $business = $record->business;
                         $theme = $business->invoice_theme ?? 'modern';
                         $color = $business->invoice_color ?? '#F59E0B';
-                        
-                        // 2. Render PDF
+                        $accounts = $business->accounts()
+                            ->whereNotNull('account_number')
+                            ->where('account_number', '!=', '')
+                            ->get();
+
                         $pdf = Pdf::loadView('invoices.' . $theme, [
                             'order' => $record,
                             'color' => $color,    
                             'logo' => $business->logo,
+                            'accounts' => $accounts,
+                            'show_discount' => $data['show_discount'],
                         ])->setPaper('a4', 'portrait');
 
-                        // 3. Simpan PDF ke folder public secara fisik
                         $fileName = 'invoices/Invoice-' . $record->number . '.pdf';
                         Storage::disk('public')->put($fileName, $pdf->output());
-
-                        // 4. Dapatkan URL Publik dari PDF tersebut
                         $fileUrl = asset('storage/' . $fileName);
 
-                        // 5. Cek & Format Nomor WA Pelanggan
                         $phone = $record->customer->phone ?? ''; 
-                        
+                        $customer = $record->customer->name ?? '';
                         if (empty($phone)) {
                             Notification::make()
                                 ->title('Gagal Mengirim')
-                                ->body('Nomor WhatsApp pelanggan tidak ditemukan di data transaksi ini.')
+                                ->body('Nomor WhatsApp pelanggan tidak ditemukan.')
                                 ->danger()
                                 ->send();
                             return;
                         }
 
-                        // Format nomor (0812 jadi 62812)
                         $phone = preg_replace('/[^0-9]/', '', $phone);
                         if (str_starts_with($phone, '0')) {
                             $phone = '62' . substr($phone, 1);
                         }
 
-                        // 6. Buat Teks Pesan WA
-                        $message = "Halo Bapak/Ibu, \n\nBerikut adalah tagihan (Invoice) untuk pesanan Anda: *{$record->number}*.\n\n";
+                        $message = "Halo {$customer}, \n\nBerikut adalah tagihan (Invoice) untuk pesanan Anda: *{$record->number}*.\n\n";
                         $message .= "Anda dapat melihat dan mengunduh invoice melalui tautan berikut:\n";
                         $message .= $fileUrl . "\n\n";
-                        $message .= "Terima kasih telah mempercayakan bisnis Anda kepada *{$business->name}*.";
+                        $message .= "Terima kasih telah bertransaksi dengan *{$business->name}*.";
 
                         $waUrl = "https://wa.me/{$phone}?text=" . urlencode($message);
 
-                        // 7. Munculkan Notifikasi dengan tombol Buka WA (Agar bisa buka di Tab Baru)
                         Notification::make()
                             ->title('Link Invoice Siap Dikirim!')
                             ->body('Klik tombol di bawah untuk membuka WhatsApp.')
@@ -145,12 +186,7 @@ class OrdersTable
                             ])
                             ->send();
                     }),
-                // Action::make('preview_pdf')
-                //     ->label('Preview PDF')
-                //     ->icon('heroicon-o-document')
-                //     ->color('warning')
-                //     ->url(fn (Order $record) => route('invoice.preview', $record))
-                //     ->openUrlInNewTab()
+
                 Action::make('payment')
                     ->label('Terima Pembayaran')
                     ->icon('heroicon-o-currency-dollar')
@@ -199,6 +235,7 @@ class OrdersTable
 
                         Notification::make()->title('Pembayaran Diterima & Stok Berkurang')->success()->send();
                     }),
+                
                 EditAction::make()->label(''),
             ])
             ->toolbarActions([

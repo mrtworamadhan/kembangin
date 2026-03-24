@@ -117,6 +117,7 @@
                 color: #e4e4e7 !important;
             }
         </style>
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 <body class="antialiased bg-zinc-50 dark:bg-zinc-900 transition-colors duration-300">
 
@@ -246,6 +247,7 @@
     </div>
 
     @livewireScripts
+    
     
 </body>
 </html>

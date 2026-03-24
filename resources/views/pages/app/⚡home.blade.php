@@ -101,16 +101,24 @@ new #[Layout('layouts::pwa')] class extends Component
             $q->whereIn('users.id', $familyIds);
         })->pluck('id');
 
+        // Total Net Sales
         $homeSales = Order::whereIn('business_id', $familyBusinesses)->where('order_date', '>=', $thisMonth)->sum('total_amount');
-        $homePurchase = Purchase::whereIn('business_id', $familyBusinesses)->where('date', '>=', $thisMonth)->sum('total_amount');
+        
+        $homeHpp = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.business_id', $familyBusinesses)
+            ->where('orders.order_date', '>=', $thisMonth)
+            ->sum('order_items.total_base_price');
+
         $homeOpEx = Transaction::whereIn('business_id', $familyBusinesses)->where('date', '>=', $thisMonth)
             ->whereHas('category', fn($q) => $q->where('type', 'expense')->whereNotIn('name', [
                 'Bahan Baku / Pembelian Stok',
                 'Penarikan Prive / Deviden',
                 'Transfer Keluar'
             ]))->sum('amount');
-        $businessProfit = $homeSales - $homePurchase - $homeOpEx;
-
+        
+        $businessProfit = $homeSales - $homeHpp - $homeOpEx;
+        
         // 4. DATA TARGET IMPIAN TERDEKAT
         $activeGoal = Goal::whereIn('user_id', $familyIds)
             ->where('status', 'active')
@@ -289,7 +297,7 @@ new #[Layout('layouts::pwa')] class extends Component
                             <p class="font-bold text-zinc-800 dark:text-zinc-100 text-sm">{{ $activeGoal->name }}</p>
                             @if($activeGoal->deadline)
                                 <p class="text-[9px] font-bold text-amber-500 flex items-center gap-1 mt-0.5">
-                                    <x-heroicon-o-clock class="w-3 h-3" /> Target: {{ \Carbon\Carbon::parse($activeGoal->deadline)->translatedFormat('d M Y') }}
+                                    <x-heroicon-o-clock class="w-3 h-3" /> Target: {{ Carbon::parse($activeGoal->deadline)->translatedFormat('d M Y') }}
                                 </p>
                             @endif
                         </div>

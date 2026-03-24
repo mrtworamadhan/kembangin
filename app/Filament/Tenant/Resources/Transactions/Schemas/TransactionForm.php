@@ -51,31 +51,28 @@ class TransactionForm
 
                         Select::make('category_id')
                             ->label('Kategori')
-                            ->relationship('category', 'name') 
-                            ->options(function (Get $get) {
-                                $type = $get('type'); 
-                                $tenantId = Filament::getTenant()->id;
+                            ->relationship(
+                                name: 'category', 
+                                titleAttribute: 'name',
+                                modifyQueryUsing: function (Builder $query, Get $get) {
+                                    $type = $get('type');
+                                    $tenantId = Filament::getTenant()->id;
 
-                                if (! $type) {
-                                    return [];
-                                }
+                                    if (! $type) {
+                                        return $query->whereRaw('1 = 0'); 
+                                    }
 
-                                return Category::query()
-                                    ->where('type', $type) 
-                                    ->where('group', 'business')
-                                    ->where(function ($query) use ($tenantId) {
-                                        $query->where('business_id', $tenantId)
+                                    return $query->where('type', $type)
+                                        ->where('group', 'business')
+                                        ->where(function ($q) use ($tenantId) {
+                                            $q->where('business_id', $tenantId)
                                             ->orWhereNull('business_id');
-                                    })
-                                    ->pluck('name', 'id');
-                            })
+                                        });
+                                }
+                            )
                             ->searchable()
-                            ->required()
-                            ->createOptionForm([
-                                TextInput::make('name')->required(),
-                                Hidden::make('type')->default(fn (Get $get) => $get('type')),
-                                Hidden::make('group')->default('business'),
-                            ]),
+                            ->preload() 
+                            ->required(),
 
                         TextInput::make('amount')
                             ->label('Nominal')

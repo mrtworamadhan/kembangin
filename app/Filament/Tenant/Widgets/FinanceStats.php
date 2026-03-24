@@ -9,11 +9,9 @@ use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\HtmlString; // Import ini untuk HTML custom
+use Illuminate\Support\HtmlString; 
 
 class FinanceStats extends BaseWidget implements HasForms
 {
@@ -23,12 +21,12 @@ class FinanceStats extends BaseWidget implements HasForms
 
     protected function getHeading(): ?string
     {
-        return 'Rekap Tahunan';
+        return 'Rekap Keuangan';
     }
 
     protected function getDescription(): ?string
     {
-        return 'Rekap Order Bulan Berjalan';
+        return 'Performa Bisnis Bulan Berjalan vs All-Time';
     }
 
     protected function getStats(): array
@@ -38,10 +36,12 @@ class FinanceStats extends BaseWidget implements HasForms
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
+        // 1. MODAL USAHA (ALL TIME)
         $modal = Transaction::where('business_id', $tenantId)
             ->whereHas('category', fn ($q) => $q->where('name', 'Suntikan Modal Tambahan'))
             ->sum('amount');
 
+        // 2. PENJUALAN BULAN INI (NET SALES - Karena total_amount sudah dikurangi diskon global)
         $salesPaid = Order::where('business_id', $tenantId)
             ->where('payment_status', 'paid')
             ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
@@ -54,20 +54,25 @@ class FinanceStats extends BaseWidget implements HasForms
 
         $totalSales = $salesPaid + $salesUnpaid;
 
+        // Info Tambahan: Berapa Diskon Global yang diberikan bulan ini?
+        $totalDiscountGiven = Order::where('business_id', $tenantId)
+            ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
+            ->sum('discount_amount');
+
+        // 3. HUTANG PEMBELIAN (BULAN INI)
         $purchaseUnpaid = Purchase::where('business_id', $tenantId)
-
             ->where('payment_status', 'unpaid')
-
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
-
             ->sum('total_amount');
 
+        // 4. HPP / COGS (BULAN INI) - Modal dari barang yang TERJUAL
         $totalHpp = \Illuminate\Support\Facades\DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->where('orders.business_id', $tenantId)
             ->whereBetween('orders.order_date', [$startOfMonth, $endOfMonth])
             ->sum('order_items.total_base_price');
 
+        // 5. BEBAN OPERASIONAL (BULAN INI)
         $operationalExpense = Transaction::where('business_id', $tenantId)
             ->whereHas('category', function ($q) {
                 $q->where('type', 'expense')
@@ -80,8 +85,10 @@ class FinanceStats extends BaseWidget implements HasForms
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->sum('amount');
 
+        // 6. PROFIT BULAN INI
         $estimatedProfit = $totalSales - $totalHpp - $operationalExpense;
 
+        // 7. DATA ALL TIME (Untuk Ekuitas / Laba Ditahan)
         $totalPrive = Transaction::where('business_id', $tenantId)
             ->whereHas('category', fn ($q) => $q->where('name', 'Penarikan Prive / Deviden'))
             ->sum('amount');
@@ -105,14 +112,13 @@ class FinanceStats extends BaseWidget implements HasForms
             ->sum('amount');
 
         $totalProfitAllTime = $totalSalesAllTime - $totalHppAllTime - $totalOpExAllTime;
-
         $sisaProfit = $totalProfitAllTime - $totalPrive;
 
         $formatRp = fn ($val) => 'Rp ' . number_format($val, 0, ',', '.');
 
         return [
             Stat::make('Modal Usaha', $formatRp($modal))
-                ->description('Total investasi owner')
+                ->description('Total investasi owner (All-Time)')
                 ->descriptionIcon('heroicon-m-circle-stack')
                 ->color('warning'),
 
@@ -120,26 +126,29 @@ class FinanceStats extends BaseWidget implements HasForms
                 ->description(new HtmlString(
                     '<div class="mt-1 text-xs">
                         <span class="text-success-600">✅ Lunas: ' . $formatRp($salesPaid) . '</span><br>
-                        <span class="text-warning-600">⏳ Piutang: ' . $formatRp($salesUnpaid) . '</span>
+                        <span class="text-warning-600">⏳ Piutang: ' . $formatRp($salesUnpaid) . '</span><br>
+                        <span class="text-red-500 text-[10px] italic">*) Diskon Promo: ' . $formatRp($totalDiscountGiven) . '</span>
                     </div>'
                 ))
                 ->color('success')
                 ->chart([7, 3, 10, 5, 12, 10]),
 
-            Stat::make('HPP / COGS', $formatRp($totalHpp))
+            Stat::make('HPP & Kewajiban', $formatRp($totalHpp))
                 ->description(new HtmlString(
                     '<div class="mt-1 text-xs">
-                        <span class="text-warning-600">⏳ Hutang: ' . $formatRp($purchaseUnpaid) . '</span>
+                        <span class="text-gray-500">HPP / Modal Barang Terjual</span><br>
+                        <span class="text-danger-600 mt-1 block border-t border-gray-200 pt-1">⏳ Hutang Supplier: ' . $formatRp($purchaseUnpaid) . '</span>
                     </div>'
                 ))
                 ->color('danger'),
 
             Stat::make('Profit Bersih (Bulan Ini)', $formatRp($estimatedProfit))
                 ->description(new HtmlString(
-                    '<div class="mt-1 text-xs">
+                    '<div class="mt-1 text-xs border-t border-gray-200 pt-1">
+                        <span class="text-gray-600 font-semibold">REKAP ALL-TIME:</span><br>
                         <span class="text-gray-500">Total Est. Profit : ' . $formatRp($totalProfitAllTime) . '</span><br>
-                        <span class="text-purple-600">Total Penarikan: ' . $formatRp($totalPrive) . '</span><br>
-                        <span class="text-purple-600">Profit Ditahan: ' . $formatRp($sisaProfit) . '</span>
+                        <span class="text-danger-500">Total Penarikan: - ' . $formatRp($totalPrive) . '</span><br>
+                        <span class="text-success-600 font-bold">Laba Ditahan: ' . $formatRp($sisaProfit) . '</span>
                     </div>'
                 ))
                 ->color($estimatedProfit >= 0 ? 'success' : 'danger')

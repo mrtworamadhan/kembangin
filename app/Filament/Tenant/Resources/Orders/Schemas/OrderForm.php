@@ -11,6 +11,8 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -19,150 +21,278 @@ use Filament\Schemas\Schema;
 
 class OrderForm
 {
-    public static function configure(Schema $schema): Schema
+    public static function updateGrandTotal(Get $get, Set $set, bool $isInsideRepeater = false): void
     {
-        return $schema
-            ->components([
-                Group::make()
+        $items = $isInsideRepeater ? ($get('../../items') ?? []) : ($get('items') ?? []);
+        $discountGlobal = (float) ($isInsideRepeater ? ($get('../../discount_amount') ?? 0) : ($get('discount_amount') ?? 0));
+
+        // 1. Hitung Subtotal
+        $subtotal = collect($items)->sum(function ($item) {
+            $qty = (float) ($item['quantity'] ?? 0);
+            $price = (float) ($item['unit_price'] ?? 0);
+            $itemDiscount = (float) ($item['discount_amount'] ?? 0); 
+            
+            // RUMUS BARU: Diskon dikalikan dengan Qty
+            $itemTotal = $qty * ($price - $itemDiscount); 
+            
+            return $itemTotal > 0 ? $itemTotal : 0; // Cegah subtotal item minus
+        });
+
+        // 2. Hitung Grand Total (Subtotal Semua Item - Diskon Global)
+        $grandTotal = $subtotal - $discountGlobal;
+
+        if ($grandTotal < 0) {
+            $grandTotal = 0;
+        }
+
+        if ($isInsideRepeater) {
+            $set('../../total_amount', $grandTotal);
+        } else {
+            $set('total_amount', $grandTotal);
+        }
+    }
+
+    public static function configure(Schema $form): Schema
+    {
+        return $form
+            ->schema([
+                Section::make('Informasi Order')
                     ->schema([
-                        Section::make('Informasi Order')
-                            ->schema([
-                                TextInput::make('number')
-                                    ->default(function () {
-                                            $tenantId = Filament::getTenant()->id;
+                        Grid::make(2)->schema([
+                            TextInput::make('number')
+                                ->label('Nomor Invoice')
+                                ->default(function () {
+                                    $tenantId = Filament::getTenant()->id;
 
-                                            $lastOrder = Order::where('business_id', $tenantId)
-                                                ->latest('id')
-                                                ->first();
+                                    $lastOrder = Order::where('business_id', $tenantId)
+                                        ->latest('id')
+                                        ->first();
 
-                                            if (! $lastOrder) {
-                                                return 'INV-0001';
-                                            }
+                                    if (!$lastOrder) {
+                                        return 'INV-0001';
+                                    }
 
-                                            $lastNumber = (int) substr($lastOrder->number, 4); 
-                                            $newNumber = $lastNumber + 1;
+                                    // Ekstrak angka saja (mengatasi bug jika prefix berubah)
+                                    $lastNumber = (int) preg_replace('/[^0-9]/', '', $lastOrder->number);
+                                    $newNumber = $lastNumber + 1;
 
-                                            return 'INV-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-                                        }) 
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->required()
-                                    ->label('Nomor Invoice')
-                                    ->unique(
-                                        ignorable: fn ($record) => $record,
-                                        modifyRuleUsing: function ($rule, $get) {
-                                            return $rule->where('business_id', Filament::getTenant()->id);
-                                        }
-                                    ),
+                                    return 'INV-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+                                })
+                                ->disabled()
+                                ->dehydrated()
+                                ->required()
+                                ->unique(
+                                    ignorable: fn($record) => $record,
+                                    modifyRuleUsing: function ($rule) {
+                                        return $rule->where('business_id', Filament::getTenant()->id);
+                                    }
+                                ),
 
-                                Select::make('customer_id')
-                                    ->relationship('customer', 'name')
-                                    ->searchable()
-                                    ->preload()
-                                    ->required()
-                                    ->createOptionForm([ 
-                                        TextInput::make('name')->required(),
-                                        TextInput::make('phone')                            
-                                            ->prefix('+62 ')
-                                            ->tel()
-                                            ->label('No. HP / WhatsApp'),
-                                        TextInput::make('email')
-                                            ->email(),
-                                    ]),
+                            Select::make('customer_id')
+                                ->label('Pelanggan')
+                                ->relationship('customer', 'name')
+                                ->searchable()
+                                ->preload()
+                                ->required()
+                                ->createOptionForm([
+                                    TextInput::make('name')->required(),
+                                    TextInput::make('phone')
+                                        ->prefix('+62 ')
+                                        ->tel()
+                                        ->label('No. HP / WhatsApp'),
+                                    TextInput::make('email')
+                                        ->email(),
+                                ]),
 
-                                Select::make('status')
-                                    ->options([
-                                        'new' => 'Baru (Draft)',
-                                        'processing' => 'Proses',
-                                        'completed' => 'Selesai',
-                                        'cancelled' => 'Batal',
-                                    ])
-                                    ->required()
-                                    ->default('new'),
+                            Select::make('status')
+                                ->label('Status Pesanan')
+                                ->options([
+                                    'new' => 'Baru (Draft)',
+                                    'processing' => 'Proses',
+                                    'completed' => 'Selesai',
+                                    'cancelled' => 'Batal',
+                                ])
+                                ->required()
+                                ->default('new'),
 
-                                Select::make('payment_status')
-                                    ->options([
-                                        'unpaid' => 'Belum Bayar',
-                                        'paid' => 'Lunas',
-                                    ])
-                                    ->default('unpaid')
-                                    ->required(),
-                                    
-                                DatePicker::make('order_date')
-                                    ->default(now())
-                                    ->required(),
-                            ])->columns(2),
-                    ]),
+                            Select::make('payment_status')
+                                ->label('Status Pembayaran')
+                                ->options([
+                                    'unpaid' => 'Belum Bayar',
+                                    'paid' => 'Lunas',
+                                ])
+                                ->default('unpaid')
+                                ->required(),
+
+                            DatePicker::make('order_date')
+                                ->label('Tanggal Order')
+                                ->default(now())
+                                ->required(),
+                        ])
+
+                    ])->columnSpanFull(),
 
                 Section::make('Item Pesanan')
+                    ->columnSpanFull()
                     ->schema([
                         Repeater::make('items')
                             ->relationship() 
                             ->schema([
-                                // Pilih Produk
                                 Select::make('product_id')
+                                    ->label('Pilih Produk')
                                     ->relationship('product', 'name')
                                     ->required()
-                                    ->reactive() 
-                                    ->afterStateUpdated(function ($state, Set $set) {
+                                    ->live(debounce: 500) 
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                         $product = Product::find($state);
                                         if ($product) {
                                             $set('unit_price', $product->price);
-                                            $set('product_name', $product->name); 
+                                            $set('product_name', $product->name);
+                                            
+                                            $qty = (float) ($get('quantity') ?? 1);
+                                            $disc = (float) ($get('discount_amount') ?? 0);
+                                            // RUMUS BARU
+                                            $sub = $qty * ((float) $product->price - $disc);
+                                            $set('subtotal', $sub > 0 ? $sub : 0);
+                                            
+                                            self::updateGrandTotal($get, $set, true);
                                         }
                                     })
-                                    ->columnSpan(4),
+                                    ->columnSpan(fn (Get $get) => $get('is_discounted') ? 3 : 4), 
                                 
                                 Hidden::make('product_name'),
 
                                 TextInput::make('quantity')
+                                    ->label('Qty')
                                     ->numeric()
                                     ->default(1)
                                     ->minValue(1)
                                     ->required()
-                                    ->reactive() 
-                                    ->afterStateUpdated(fn ($state, Set $set, Get $get) => $set('subtotal', $state * $get('unit_price')))
+                                    ->live(debounce: 500) 
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        $price = (float) $get('unit_price');
+                                        $disc = (float) ($get('discount_amount') ?? 0);
+                                        // RUMUS BARU
+                                        $sub = ((float) $state) * ($price - $disc);
+                                        $set('subtotal', $sub > 0 ? $sub : 0);
+                                        
+                                        self::updateGrandTotal($get, $set, true);
+                                    })
                                     ->columnSpan(2),
 
                                 TextInput::make('unit_price')
+                                    ->label('Harga Satuan')
                                     ->numeric()
                                     ->required()
                                     ->prefix('Rp')
-                                    ->reactive()
-                                    ->afterStateUpdated(fn ($state, Set $set, Get $get) => $set('subtotal', $state * $get('quantity')))
-                                    ->columnSpan(3),
+                                    ->live(debounce: 500)
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        $qty = (float) $get('quantity');
+                                        $disc = (float) ($get('discount_amount') ?? 0);
+                                        // RUMUS BARU
+                                        $sub = $qty * (((float) $state) - $disc);
+                                        $set('subtotal', $sub > 0 ? $sub : 0);
+                                        
+                                        self::updateGrandTotal($get, $set, true);
+                                    })
+                                    ->columnSpan(fn (Get $get) => $get('is_discounted') ? 2 : 3),
+
+                                Toggle::make('is_discounted')
+                                    ->label('Disc?')
+                                    ->inline(false)
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        if (!$state) {
+                                            $set('discount_amount', 0);
+                                            $qty = (float) $get('quantity');
+                                            $price = (float) $get('unit_price');
+                                            $sub = $qty * $price; // Normal tanpa diskon
+                                            $set('subtotal', $sub > 0 ? $sub : 0);
+                                            
+                                            self::updateGrandTotal($get, $set, true);
+                                        }
+                                    })
+                                    ->columnSpan(1),
+
+                                TextInput::make('discount_amount')
+                                    ->label('Diskon/Pcs')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->prefix('Rp')
+                                    ->live(debounce: 500)
+                                    ->visible(fn (Get $get) => $get('is_discounted'))
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        $qty = (float) $get('quantity');
+                                        $price = (float) $get('unit_price');
+                                        $disc = (float) $state;
+                                        // RUMUS BARU
+                                        $sub = $qty * ($price - $disc);
+                                        $set('subtotal', $sub > 0 ? $sub : 0);
+                                        
+                                        self::updateGrandTotal($get, $set, true);
+                                    })
+                                    ->columnSpan(2),
 
                                 TextInput::make('subtotal')
+                                    ->label('Subtotal')
                                     ->numeric()
                                     ->readOnly()
                                     ->prefix('Rp')
-                                    ->columnSpan(3),
+                                    ->columnSpan(2),
                             ])
                             ->columns(12)
-                            ->live()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function (Get $get, Set $set) {
-                                $items = $get('items') ?? [];
-
-                                $total = collect($items)->sum(function ($item) {
-                                    return ((float) ($item['quantity'] ?? 0)) 
-                                        * ((float) ($item['unit_price'] ?? 0));
-                                });
-
-                                $set('total_amount', $total);
+                                self::updateGrandTotal($get, $set, false);
                             }),
                     ]),
 
-                Section::make()
+                Section::make('Diskon & Cashback (Global)')
+                    ->schema([
+                        Toggle::make('is_discounted')
+                            ->label('Tambahkan Diskon / Cashback?')
+                            ->live()
+                            ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                if (!$state) {
+                                    $set('discount_amount', 0);
+                                    self::updateGrandTotal($get, $set, false);
+                                }
+                            })
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
+
+                        TextInput::make('discount_amount')
+                            ->label('Nominal Diskon (Rp)')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->default(0)
+                            ->live(debounce: 500)
+                            ->afterStateUpdated(function (Get $get, Set $set) {
+                                self::updateGrandTotal($get, $set, false);
+                            })
+                            ->required(fn(Get $get) => $get('is_discounted'))
+                            ->visible(fn(Get $get) => $get('is_discounted')),
+
+                        TextInput::make('discount_note')
+                            ->label('Keterangan Diskon')
+                            ->placeholder('Contoh: Promo Lebaran, Cashback Pelanggan Setia')
+                            ->maxLength(255)
+                            ->required(fn(Get $get) => $get('is_discounted'))
+                            ->visible(fn(Get $get) => $get('is_discounted')),
+                    ])->columns(2),
+
+                Section::make('Ringkasan')
                     ->schema([
                         TextInput::make('total_amount')
-                            ->label('Grand Total')
+                            ->label('Grand Total (Setelah Diskon)')
                             ->numeric()
                             ->prefix('Rp')
                             ->readOnly()
-                            ->default(0),
-                        
+                            ->default(0)
+                            ->extraInputAttributes(['class' => 'font-bold text-lg text-primary-600']),
+
                         Textarea::make('notes')
-                            ->label('Catatan Tambahan')
+                            ->label('Catatan Tambahan (Internal)')
                             ->rows(3),
                     ]),
             ]);

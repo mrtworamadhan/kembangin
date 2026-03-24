@@ -5,22 +5,26 @@
     <title>Invoice #{{ $order->number }}</title>
     <style>
         body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 13px; color: #555; }
-        
         .header-table { width: 100%; margin-bottom: 40px; }
         .brand-name { font-size: 20px; font-weight: bold; color: {{ $color }}; letter-spacing: 1px; }
-        
         .invoice-title { font-size: 40px; font-weight: 300; color: #ddd; text-align: right; line-height: 1; }
         .invoice-number { font-size: 14px; color: #888; text-align: right; }
-
         .items-table { width: 100%; border-collapse: collapse; margin-top: 30px; }
         .items-table th { text-align: left; padding: 10px 0; border-bottom: 2px solid #eee; color: #888; text-transform: uppercase; font-size: 11px; }
         .items-table td { padding: 15px 0; border-bottom: 1px solid #eee; }
-        
         .text-right { text-align: right; }
         .total-big { font-size: 24px; font-weight: bold; color: {{ $color }}; }
     </style>
 </head>
 <body>
+
+    @php
+        $gross_grand_total = 0;
+        foreach($order->items as $item) {
+            $gross_grand_total += ($item->quantity * $item->unit_price);
+        }
+        $final_display_total = $show_discount ? $order->total_amount : $gross_grand_total;
+    @endphp
 
     <table class="header-table">
         <tr>
@@ -52,21 +56,33 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th width="50%">Deskripsi</th>
+                <th>Deskripsi</th>
                 <th width="10%" class="text-right">Qty</th>
                 <th width="20%" class="text-right">Harga</th>
+                @if($show_discount)
+                <th width="15%" class="text-right">Diskon</th>
+                @endif
                 <th width="20%" class="text-right">Total</th>
             </tr>
         </thead>
         <tbody>
             @foreach($order->items as $item)
+            @php 
+                $gross_subtotal = $item->quantity * $item->unit_price; 
+            @endphp
             <tr>
                 <td>
                     <strong style="color: #333;">{{ $item->product->name }}</strong>
                 </td>
                 <td class="text-right">{{ $item->quantity }}</td>
                 <td class="text-right">{{ number_format($item->unit_price, 0, ',', '.') }}</td>
+                
+                @if($show_discount)
+                <td class="text-right">{{ number_format($item->discount_amount, 0, ',', '.') }}</td>
                 <td class="text-right">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                @else
+                <td class="text-right">{{ number_format($gross_subtotal, 0, ',', '.') }}</td>
+                @endif
             </tr>
             @endforeach
         </tbody>
@@ -74,13 +90,27 @@
 
     <table width="100%" style="margin-top: 20px;">
         <tr>
-            <td width="60%"></td>
-            <td width="40%" class="text-right">
+            <td width="50%"></td>
+            <td width="50%" class="text-right">
                 <table width="100%">
+                    @if($show_discount && $order->discount_amount > 0)
+                    <tr>
+                        <td style="padding: 5px; color: #777;">Subtotal</td>
+                        <td style="padding: 5px;" class="text-right">
+                            Rp {{ number_format($order->items->sum('subtotal'), 0, ',', '.') }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px; color: #777;">Diskon Global</td>
+                        <td style="padding: 5px; color: red;" class="text-right">
+                            - Rp {{ number_format($order->discount_amount, 0, ',', '.') }}
+                        </td>
+                    </tr>
+                    @endif
                     <tr>
                         <td style="padding: 5px; color: #777;">Total Tagihan</td>
                         <td style="padding: 5px;" class="text-right total-big">
-                            Rp {{ number_format($order->total_amount, 0, ',', '.') }}
+                            Rp {{ number_format($final_display_total, 0, ',', '.') }}
                         </td>
                     </tr>
                 </table>
