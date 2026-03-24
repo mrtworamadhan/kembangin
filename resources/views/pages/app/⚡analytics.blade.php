@@ -352,7 +352,6 @@ new #[Layout('layouts::pwa')] class extends Component {
             ? User::where('household_id', $user->household_id)->pluck('id')->toArray() 
             : [$user->id];
 
-        dd($familyIds);
         [$start, $end] = $this->getSelectedRange();
         $monthName = Carbon::create()->month($this->selectedMonth)->translatedFormat('F');
         $year = $this->selectedYear;
