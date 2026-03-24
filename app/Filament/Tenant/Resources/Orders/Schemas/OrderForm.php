@@ -47,7 +47,13 @@ class OrderForm
                                     ->disabled()
                                     ->dehydrated()
                                     ->required()
-                                    ->label('Nomor Invoice'),
+                                    ->label('Nomor Invoice')
+                                    ->unique(
+                                        ignorable: fn ($record) => $record,
+                                        modifyRuleUsing: function ($rule, $get) {
+                                            return $rule->where('business_id', Filament::getTenant()->id);
+                                        }
+                                    ),
 
                                 Select::make('customer_id')
                                     ->relationship('customer', 'name')
