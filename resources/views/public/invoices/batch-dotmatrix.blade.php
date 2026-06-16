@@ -307,7 +307,7 @@
                     <p style="color: #777; font-size: 12px; margin: 0;">Penerima,</p>
                     
                     @if($order->business->signature)
-                        <img src="{{ public_path('storage/' . $order->business->signature) }}" style="height: 50px; margin: 5px 0;">
+                        <img src="{{ asset('storage/' . $order->business->signature) }}" style="height: 50px; margin: 5px 0;">
                     @else
                         <br><br><br>
                     @endif
