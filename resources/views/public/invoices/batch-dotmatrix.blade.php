@@ -120,6 +120,9 @@
         </thead>
         <tbody>
             @foreach($order->items as $index => $item)
+            @php 
+                $gross_subtotal = $item->quantity * $item->unit_price; 
+            @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>{{ $item->product->name }}</td>
