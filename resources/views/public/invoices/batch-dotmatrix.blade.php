@@ -123,7 +123,7 @@
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>{{ $item->product->name }}</td>
-                <td class="text-center">{{ $item->qty_billed }} {{ $item->productUnit?->unit_name ?? 'Pcs' }}</td>
+                <td class="text-center">{{ $item->quantity }} {{ $item->productUnit?->unit_name ?? '' }}</td>
                 <td class="text-right">{{ number_format($item->unit_price, 0, ',', '.') }}</td>
                 <td class="text-right">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
             </tr>
