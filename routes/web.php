@@ -29,7 +29,8 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
+Route::get('/invoice/{number}/print-batch', [App\Http\Controllers\InvoiceController::class, 'printBatch'])
+    ->name('invoice.print-batch');
 Route::get('/invoice/{order}/preview', function (Order $order) {
     $business = $order->business;
     $theme = $order->business->invoice_theme ?? 'modern';

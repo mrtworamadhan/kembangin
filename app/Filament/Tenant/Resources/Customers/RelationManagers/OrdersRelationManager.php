@@ -2,6 +2,9 @@
 
 namespace App\Filament\Tenant\Resources\Customers\RelationManagers;
 
+use App\Models\Order;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Actions\Action;
 use Filament\Actions\AssociateAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -15,6 +18,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -124,7 +128,76 @@ class OrdersRelationManager extends RelationManager
                 //
             ])
             ->recordActions([
-                ViewAction::make(),
+                Action::make('print_batch')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('success')
+                    ->url(fn ($record) => route('invoice.print-batch', $record->number))
+                    ->openUrlInNewTab(),
+                Action::make('pdf')
+                    ->label('PDF INV')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('warning')
+                    ->form([
+                        Toggle::make('show_discount')
+                            ->label('Tampilkan Rincian Diskon?')
+                            ->default(true)
+                            ->helperText('Jika dimatikan, invoice tidak akan menampilkan kata "Diskon". Harga item akan otomatis ditampilkan sebagai Harga Netto.'),
+                    ])
+                    ->action(function (Order $record, array $data) { 
+                        $business = $record->business;
+                        $theme = $record->business->invoice_theme ?? 'modern';
+                        $color = $business->invoice_color ?? '#F59E0B';
+                        $accounts = $business->accounts()
+                            ->whereNotNull('account_number')
+                            ->where('account_number', '!=', '')
+                            ->get();
+                        
+                        $pdf = Pdf::loadView('invoices.' . $theme, [
+                            'order' => $record,
+                            'color' => $color,    
+                            'logo' => $business->logo,
+                            'accounts' => $accounts,
+                            'show_discount' => $data['show_discount'], 
+                        ]);
+
+                        $pdf->setPaper('a4', 'portrait');
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->output();
+                        }, 'Invoice-' . $record->number . '.pdf');
+                    }),
+
+                Action::make('kwitansi')
+                    ->label('Kwitansi')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('info')
+                    // Tombol ini HANYA muncul kalau sudah dibayar
+                    ->visible(fn (Order $record) => $record->payment_status === 'paid')
+                    ->form([
+                        Toggle::make('show_discount')
+                            ->label('Tampilkan Harga Diskon?')
+                            ->default(true)
+                            ->helperText('Jika dimatikan, nominal kuitansi akan mencatat total harga normal (seolah tidak ada diskon).'),
+                    ])
+                    ->action(function (Order $record, array $data) {
+                        $business = $record->business;
+                        $color = $business->invoice_color ?? '#F59E0B';
+                        
+                        $pdf = Pdf::loadView('invoices.kwitansi', [
+                            'order' => $record,
+                            'color' => $color,    
+                            'logo' => $business->logo,
+                            'show_discount' => $data['show_discount'], 
+                        ]);
+
+                        // Kuitansi biasanya formatnya memanjang (Landscape) ukuran setengah A4 (A5)
+                        $pdf->setPaper('a4', 'landscape');
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->output();
+                        }, 'Kwitansi-' . $record->number . '.pdf');
+                    }),
                 
             ])
             ->toolbarActions([
