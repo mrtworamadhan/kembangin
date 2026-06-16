@@ -98,7 +98,7 @@
             <tr>
                 <td width="50%">
                     <strong>NOTA : #{{ $order->number }}</strong><br>
-                    TGL  : {{ \Carbon\Carbon::parse($order->delivery_date)->format('d/m/Y') }}
+                    TGL  : {{ \Carbon\Carbon::parse($order->order_date)->format('d/m/Y') }}
                 </td>
                 <td width="50%" class="text-right">
                     <strong>KEPADA:</strong> {{ $order->customer->name ?? 'Umum' }}<br>
