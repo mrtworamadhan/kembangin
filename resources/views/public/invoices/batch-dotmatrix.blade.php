@@ -125,7 +125,7 @@
                 <td>{{ $item->product->name }}</td>
                 <td class="text-center">{{ $item->quantity }} {{ $item->productUnit?->unit_name ?? '' }}</td>
                 <td class="text-right">{{ number_format($item->unit_price, 0, ',', '.') }}</td>
-                <td class="text-right">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                <td class="text-right text-bold">Rp {{ number_format($gross_subtotal, 0, ',', '.') }}</td>
             </tr>
             @if($item->qty_bonus > 0)
             <tr>
