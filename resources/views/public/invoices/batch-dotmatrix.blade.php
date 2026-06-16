@@ -306,7 +306,7 @@
                     </span>
                 </td>
                 <td width="50%" valign="bottom" style="text-align: right;">
-                    <p style="margin: 0 0 5px 0;">{{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}</p>
+                    <p style="margin: 0 0 5px 0;">{{ \Carbon\Carbon::parse($order->updated_at)->translatedFormat('d F Y') }}</p>
                     <p style="color: #777; font-size: 12px; margin: 0;">Penerima,</p>
                     
                     @if($order->business->signature)
